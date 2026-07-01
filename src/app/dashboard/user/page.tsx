@@ -31,6 +31,7 @@ interface MyRequestItem {
   updated_at?: string | null;
   categories: { name: string; sla_days: number } | null;
   pic?: { full_name: string } | null;
+  file_url?: string | null;
 }
 
 interface HistoryLog {
@@ -680,6 +681,24 @@ export default function UserDashboard() {
                   </Text>
                 </Paper>
               </Box>
+
+              {selectedRequest.file_url && (
+                <Box>
+                  <Text size="xs" c="dimmed" fw={600} mb={4}>BERKAS LAMPIRAN FISIK</Text>
+                  <Button
+                    component="a"
+                    href={selectedRequest.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    variant="outline"
+                    color="ptpn4Green.9"
+                    fullWidth
+                    leftSection={<IconDownload size={16} />}
+                  >
+                    Buka / Unduh Dokumen PDF
+                  </Button>
+                </Box>
+              )}
 
               <Divider my="sm" label={<Text size="10px" fw={700} c="slateClean.4" lts="0.5px">KRONOLOGI ALUR DOKUMEN</Text>} labelPosition="center" />
 
