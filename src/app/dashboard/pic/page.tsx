@@ -70,6 +70,8 @@
 
     const [selectedDetail, setSelectedDetail] = useState<RequestItem | null>(null);
 
+    const [holdReason, setHoldReason] = useState('');
+
     useEffect(() => {
       initPic();
 
@@ -248,7 +250,7 @@
         case 'Dalam Proses oleh Head Office': nextStatus = 'Dalam Proses oleh Holding'; break;
         case 'Dalam Proses oleh Holding': nextStatus = 'Dalam Proses oleh Konsultan'; break;
         default:
-          alert(`Gagal Maju: Status "${req.status}" tidak dikenali dalam workflow.`);
+          alert(`Gagal Maju: Status "${req.status}" tidak dikenali.`);
           return;
       }
 
@@ -302,7 +304,7 @@
       }
     };
 
-    const handleToggleHold = async (req: RequestItem) => {
+    const handleToggleHold = async (req: RequestItem, notes: string = holdReason) => {
       const nowStr = new Date().toISOString();
       let nextStatus = '';
 
@@ -319,7 +321,7 @@
 
         try {
           const { error: holdError } = await supabase.from('request_holds').insert([
-            { request_id: req.id, hold_reason: `Penahanan berkas pada fase ${req.status}`, hold_start: nowStr }
+            { request_id: req.id, hold_reason: `Penangguhan berkas pada fase ${req.status}`, hold_start: nowStr }
           ]);
           if (holdError) throw holdError;
 
@@ -327,7 +329,7 @@
           if (reqError) throw reqError;
 
           const { error: logError } = await supabase.from('request_logs').insert([
-            { request_id: req.id, changed_by: currentPicId, status_before: req.status, status_after: nextStatus, notes: 'Berkas ditangguhkan sementara' }
+            { request_id: req.id, changed_by: currentPicId, status_before: req.status, status_after: nextStatus, notes: holdReason.trim() !== '' ? notes : 'Pengajuan ditangguhkan sementara' }
           ]);
           if (logError) throw logError;
 
@@ -411,10 +413,11 @@
             .eq('id', req.id);
           if (reqError) throw reqError;
 
+          const actualNotes = notes.trim() !== '' ? notes : 'Proses kembali dilanjutkan.';
+
           const { error: logError } = await supabase.from('request_logs').insert([
-            { request_id: req.id, changed_by: currentPicId, status_before: req.status, status_after: nextStatus, notes: 'Pengajuan dilepas dari status hold' }
+            { request_id: req.id, changed_by: currentPicId, status_before: req.status, status_after: nextStatus, notes: actualNotes }
           ]);
-          if (logError) throw logError;
 
           try {
             await fetch('/api/send-email', {
@@ -434,8 +437,8 @@
           setRequests((prev) => prev.map((r) => (r.id === req.id ? { ...r, status: nextStatus, total_hold_days: newTotalHoldDays, updated_at: nowStr } : r)));
 
           notifications.show({
-            title: 'Penangguhan SLA Dilepas',
-            message: `SLA Tiket ${req.ticket_number} kembali berjalan normal.`,
+            title: 'Penangguhan Dilepas',
+            message: `Proses Tiket ${req.ticket_number} kembali berjalan normal.`,
             color: 'green',
           });
 
@@ -928,6 +931,54 @@
             </Stack>
           </Modal>
 
+        <Modal
+          opened={confirmHoldRequest !== null}
+          onClose={() => { setConfirmHoldRequest(null); setHoldReason(''); }}
+          title={<Text fw={700} size="md">Konfirmasi Penangguhan</Text>}
+          centered
+          radius="lg"
+        >
+          <Stack gap="md">
+            <Text size="sm" c="slateClean.7">
+              {confirmHoldRequest?.status.startsWith('Sedang Ditangguhkan') ? (
+                <>Anda akan melepas status penangguhan pada tiket <b>{confirmHoldRequest?.ticket_number}</b>.</>
+              ) : (
+                <>Anda akan menangguhkan sementara tiket <b>{confirmHoldRequest?.ticket_number}</b>.</>
+              )}
+            </Text>
+
+            {confirmHoldRequest && !confirmHoldRequest.status.startsWith('Sedang Ditangguhkan') && (
+              <Textarea
+                label="Alasan Penangguhan"
+                placeholder="Berikan alasan penangguhan yang jelas (misal: Perlu peninjauan lebih lanjut...)"
+                required
+                rows={3}
+                value={holdReason}
+                onChange={(e) => setHoldReason(e.target.value)}
+                radius="md"
+              />
+            )}
+
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={() => { setConfirmHoldRequest(null); setHoldReason(''); }} radius="md">Batal</Button>
+              <Button
+                color={confirmHoldRequest?.status.startsWith('Sedang Ditangguhkan') ? "green.8" : "orange.8"}
+                radius="md"
+                onClick={async () => {
+                  if (confirmHoldRequest) {
+                    const tempReq = confirmHoldRequest;
+                    setConfirmHoldRequest(null);
+                    await handleToggleHold(tempReq, holdReason);
+                    setHoldReason('');
+                  }
+                }}
+              >
+                Konfirmasi
+              </Button>
+            </Group>
+          </Stack>
+        </Modal>
+
         <Drawer
           opened={selectedDetail !== null}
           onClose={() => setSelectedDetail(null)}
@@ -1022,7 +1073,7 @@
                       >
                         {log.notes && <Text size="11px" mt={2} c="slateClean.6" style={{ fontStyle: 'italic' }}>Keterangan: "{log.notes}"</Text>}
                         <Text size="9px" c={isCurrentStatus ? 'green.7' : 'ptpn4Green.8'} fw={600} mt={4}>
-                          Oleh: {log.profiles?.full_name || 'System Auto'} • {new Date(log.created_at).toLocaleDateString('id-ID')}
+                          Oleh: {log.profiles?.full_name || 'System Auto'} • {new Date(log.created_at).toLocaleString('id-ID')}
                         </Text>
                       </Timeline.Item>
                     );

@@ -134,7 +134,7 @@ export default function UserDashboard() {
     const { data } = await supabase
       .from('requests')
       .select(`
-        id, ticket_number, request_title, description, status, total_hold_days, created_at, updated_at,
+        id, ticket_number, request_title, description, status, total_hold_days, created_at, updated_at, file_url,
         user_profile:user_id (full_name, division, email),
         categories:category_id (name, sla_days),
         pic:current_pic_id (full_name),
@@ -172,6 +172,17 @@ export default function UserDashboard() {
   const handleUploadAndSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userProfile || !categoryId) return;
+
+    if (!file) {
+      notifications.show({
+        title: 'Berkas Wajib Dilampirkan',
+        message: 'Silakan unggah berkas formulir dalam format PDF terlebih dahulu.',
+        color: 'red',
+        autoClose: 4000,
+      });
+      return;
+    }
+
     setFormLoading(true);
 
     try {
@@ -461,6 +472,8 @@ export default function UserDashboard() {
                   <FileInput
                     label="Unggah Berkas Formulir (.PDF)"
                     placeholder="Pilih berkas formulir"
+                    required
+                    withAsterisk
                     value={file}
                     onChange={setFile}
                     accept="application/pdf"
@@ -684,7 +697,7 @@ export default function UserDashboard() {
 
               {selectedRequest.file_url && (
                 <Box>
-                  <Text size="xs" c="dimmed" fw={600} mb={4}>BERKAS LAMPIRAN FISIK</Text>
+                  <Text size="xs" c="dimmed" fw={600} mb={4}>LAMPIRAN BERKAS</Text>
                   <Button
                     component="a"
                     href={selectedRequest.file_url}
@@ -695,12 +708,12 @@ export default function UserDashboard() {
                     fullWidth
                     leftSection={<IconDownload size={16} />}
                   >
-                    Buka / Unduh Dokumen PDF
+                    Unduh Form Pengajuan Anda
                   </Button>
                 </Box>
               )}
 
-              <Divider my="sm" label={<Text size="10px" fw={700} c="slateClean.4" lts="0.5px">KRONOLOGI ALUR DOKUMEN</Text>} labelPosition="center" />
+              <Divider my="sm" label={<Text size="10px" fw={700} c="slateClean.4" lts="0.5px">RIWAYAT ALUR DOKUMEN</Text>} labelPosition="center" />
 
               {loadingTimeline ? (
                 <Text size="xs" ta="center" c="dimmed" py="sm">Menjemput jejak log berkas...</Text>
@@ -728,9 +741,9 @@ export default function UserDashboard() {
                           </Text>
                         }
                       >
-                        {log.notes && <Text size="11px" mt={2} c="slateClean.6" style={{ fontStyle: 'italic' }}>Catatan: "{log.notes}"</Text>}
+                        {log.notes && <Text size="11px" mt={2} c="slateClean.6" style={{ fontStyle: 'italic' }}>Keterangan: "{log.notes}"</Text>}
                         <Text size="9px" c={isCurrentStatus ? 'green.7' : 'ptpn4Green.8'} fw={600} mt={4}>
-                          Oleh: {log.profiles?.full_name || 'Otomasi Sistem'} • {new Date(log.created_at).toLocaleDateString('id-ID')}
+                          Oleh: {log.profiles?.full_name || 'Otomasi Sistem'} • {new Date(log.created_at).toLocaleString('id-ID')}
                         </Text>
                       </Timeline.Item>
                     );
