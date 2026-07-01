@@ -6,11 +6,11 @@
   import { notifications } from '@mantine/notifications';
   import {
     AppShell, SimpleGrid, Paper, Text, Group, Badge, Avatar, Table, Menu, ActionIcon, TextInput,
-    NavLink, Stack, Box, Kbd, Tooltip, Modal, Timeline, FileInput, Textarea, Button
+    NavLink, Stack, Box, Kbd, Tooltip, Modal, Timeline, FileInput, Textarea, Button, Drawer, Divider
   } from '@mantine/core';
   import {
     IconLayoutDashboard, IconFileText, IconClock, IconChecklist, IconSettings, IconLogout, IconSearch, IconBell,
-    IconMail, IconDotsVertical, IconCheck, IconX, IconAlertCircle, IconArrowUpRight, IconDownload
+    IconMail, IconDotsVertical, IconCheck, IconX, IconAlertCircle, IconArrowUpRight, IconDownload, IconEye
   } from '@tabler/icons-react';
 
   interface RequestItem {
@@ -67,6 +67,8 @@
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>('desc');
 
     const [searchQuery, setSearchQuery] = useState('');
+
+    const [selectedDetail, setSelectedDetail] = useState<RequestItem | null>(null);
 
     useEffect(() => {
       initPic();
@@ -131,6 +133,23 @@
 
     const handleOpenTimeline = async (req: RequestItem) => {
       setSelectedRequest(req);
+      setLoadingTimeline(true);
+
+      const { data } = await supabase
+        .from('request_logs')
+        .select(`
+          id, status_before, status_after, notes, created_at,
+          profiles:changed_by (full_name)
+        `)
+        .eq('request_id', req.id)
+        .order('created_at', { ascending: true });
+
+      if (data) setHistoryLogs(data as any);
+      setLoadingTimeline(false);
+    };
+
+    const handleOpenDetailAndLogs = async (req: RequestItem) => {
+      setSelectedDetail(req);
       setLoadingTimeline(true);
 
       const { data } = await supabase
@@ -640,9 +659,6 @@
                     <Table.Th style={{ borderBottom: '1px solid #e2e8f0', cursor: 'pointer' }} onClick={() => handleSortRequest('status')}>
                       <Text size="xs" fw={700} c="slateClean.5">STATUS{renderSortArrow('status')}</Text>
                     </Table.Th>
-                    <Table.Th style={{ borderBottom: '1px solid #e2e8f0' }}>
-                      <Text size="xs" fw={700} c="slateClean.5">BERKAS</Text>
-                    </Table.Th>
                     <Table.Th style={{ borderBottom: '1px solid #e2e8f0' }} w={320}>
                       <Text size="xs" fw={900} c="slateClean.5">AKSI</Text>
                     </Table.Th>
@@ -681,7 +697,7 @@
                               size="sm"
                               c="ptpn4Green.9"
                               style={{ cursor: 'pointer', display: 'inline-block' }}
-                              onClick={() => handleOpenTimeline(req)}
+                              onClick={() => handleOpenDetailAndLogs(req)}
                             >
                               {req.ticket_number} 📋
                             </Text>
@@ -721,82 +737,65 @@
                         </Table.Td>
 
                         <Table.Td>
-                          {req.file_url ? (
-                            <Button
-                              component="a"
-                              href={req.file_url}
-                              target="_blank"
-                              download
-                              variant="subtle"
-                              size="xs"
-                              color="blue"
-                              leftSection={<IconDownload size={14} />}
-                            >
-                              Unduh Berkas
-                            </Button>
-                          ) : (
-                            <Text size="xs" c="dimmed" style={{ fontStyle: 'italic' }}>Tanpa Berkas</Text>
-                          )}
-                        </Table.Td>
+                          <Group gap="xs" wrap="nowrap">
 
-                        <Table.Td>
-                          {isFinal ? (
-                            <Text size="sm" c="slateClean.6" fw={400}>
-                              Proses Pengajuan Telah Selesai
-                            </Text>
-                          ) : isLockedByOtherPic ? (
-                            <Badge color="gray.4" variant="outline" radius="sm" c="dimmed" size="m" fw="500" style={{ borderStyle: 'dashed', textTransform: 'none' }}>
-                              🔒 Ditangani oleh {req.pic?.full_name}
-                            </Badge>
-                          ) : (
-                            <Group gap="xs" wrap="nowrap">
-                              <Tooltip label={req.status === 'Dalam Proses oleh Konsultan' ? 'Upload Form_Final & Tutup SLA' : 'Lanjutkan proses ke tahap berikutnya'} position="top" withArrow>
-                                <Button
-                                  size="xs"
-                                  variant="light"
-                                  color="green"
-                                  disabled={isHoldState}
-                                  leftSection={<IconCheck size={14} />}
-                                  onClick={() => {
-                                    if (req.status === 'Dalam Proses oleh Konsultan') {
-                                      handleNextStep(req);
-                                    } else {
-                                      setConfirmNextRequest(req);
-                                    }
-                                  }}
-                                >
-                                  {req.status === 'Dalam Proses oleh Konsultan' ? 'Selesai' : 'Proses'}
-                                </Button>
-                              </Tooltip>
-
-                              {canHold && (
-                                <Tooltip label={isHoldState ? 'Lanjutkan proses ke tahap selanjutnya' : 'Tangguhkan pengajuan sementara'} position="top" withArrow>
+                            {isFinal ? (
+                              <Text size="xs" c="slateClean.4" fw={500} style={{ fontStyle: 'italic' }}>
+                                Pengajuan Selesai Diproses
+                              </Text>
+                            ) : isLockedByOtherPic ? (
+                              <Badge color="gray.4" variant="outline" radius="sm" c="dimmed" size="sm" fw="500" style={{ borderStyle: 'dashed', textTransform: 'none' }}>
+                                🔒 Ditangani oleh {req.pic?.full_name}
+                              </Badge>
+                            ) : (
+                              <>
+                                <Tooltip label={req.status === 'Dalam Proses oleh Konsultan' ? 'Upload Form_Final & Setujui Berkas' : 'Lanjutkan proses ke tahap berikutnya'} position="top" withArrow>
                                   <Button
                                     size="xs"
                                     variant="light"
-                                    color="orange"
-                                    leftSection={<IconAlertCircle size={14} />}
-                                    onClick={() => setConfirmHoldRequest(req)}
+                                    color="green"
+                                    disabled={isHoldState}
+                                    leftSection={<IconCheck size={14} />}
+                                    onClick={() => {
+                                      if (req.status === 'Dalam Proses oleh Konsultan') {
+                                        handleNextStep(req);
+                                      } else {
+                                        setConfirmNextRequest(req);
+                                      }
+                                    }}
                                   >
-                                    {isHoldState ? 'Lanjutkan' : 'Tangguhkan'}
+                                    {req.status === 'Dalam Proses oleh Konsultan' ? 'Selesai' : 'Proses'}
                                   </Button>
                                 </Tooltip>
-                              )}
 
-                              <Tooltip label="Tolak pengajuan secara permanen" position="top" withArrow>
-                                <Button
-                                  size="xs"
-                                  variant="light"
-                                  color="red"
-                                  leftSection={<IconX size={14} />}
-                                  onClick={() => setRejectRequest(req)}
-                                >
-                                  Tolak
-                                </Button>
-                              </Tooltip>
+                                {canHold && (
+                                  <Tooltip label={isHoldState ? 'Lanjutkan proses ke tahap selanjutnya' : 'Tangguhkan pengajuan sementara'} position="top" withArrow>
+                                    <Button
+                                      size="xs"
+                                      variant="light"
+                                      color="orange"
+                                      leftSection={<IconAlertCircle size={14} />}
+                                      onClick={() => setConfirmHoldRequest(req)}
+                                    >
+                                      {isHoldState ? 'Lanjutkan' : 'Tangguhkan'}
+                                    </Button>
+                                  </Tooltip>
+                                )}
 
-                            </Group>
-                          )}
+                                <Tooltip label="Tolak pengajuan secara permanen" position="top" withArrow>
+                                  <Button
+                                    size="xs"
+                                    variant="light"
+                                    color="red"
+                                    leftSection={<IconX size={14} />}
+                                    onClick={() => setRejectRequest(req)}
+                                  >
+                                    Tolak
+                                  </Button>
+                                </Tooltip>
+                              </>
+                            )}
+                          </Group>
                         </Table.Td>
                       </Table.Tr>
                     );
@@ -807,51 +806,6 @@
               </Box>
             )}
           </Paper>
-
-          <Modal
-            opened={selectedRequest !== null}
-            onClose={() => setSelectedRequest(null)}
-            title={`Riwayat Alur Tiket - ${selectedRequest?.ticket_number}`}
-            size="md"
-            centered
-            radius="lg"
-          >
-            {loadingTimeline ? (
-              <Text size="sm" ta="center" my="md">Melacak riwayat...</Text>
-            ) : (
-              <Timeline active={historyLogs.length - 1} bulletSize={22} lineWidth={2} mt="md" color="ptpn4Green.9">
-                {historyLogs.map((log, index) => {
-                  const isCurrentStatus = index === historyLogs.length - 1;
-
-                  return (
-                    <Timeline.Item
-                      key={log.id}
-                      title={
-                        <Text
-                          fw={700}
-                          size="sm"
-                          c={isCurrentStatus ? 'ptpn4Green.9' : 'slateClean.8'}
-                          style={{
-                            backgroundColor: isCurrentStatus ? '#ecfdf3' : 'transparent',
-                            padding: isCurrentStatus ? '4px 8px' : '0',
-                            borderRadius: isCurrentStatus ? '6px' : '0',
-                            display: 'inline-block'
-                          }}
-                        >
-                          {log.status_after}
-                        </Text>
-                      }
-                    >
-                      {log.notes && <Text size="xs" mt={4} c="slateClean.6" style={{ fontStyle: 'italic' }}>Keterangan: "{log.notes}"</Text>}
-                      <Text size="10px" c={isCurrentStatus ? 'green.7' : 'ptpn4Green.8'} fw={600} mt={6}>
-                        Oleh: {log.profiles?.full_name || 'System Auto'} • {new Date(log.created_at).toLocaleString('id-ID')} WIB
-                      </Text>
-                    </Timeline.Item>
-                  );
-                })}
-              </Timeline>
-            )}
-          </Modal>
 
           <Modal
             opened={finalUploadRequest !== null}
@@ -973,6 +927,111 @@
               </Group>
             </Stack>
           </Modal>
+
+        <Drawer
+          opened={selectedDetail !== null}
+          onClose={() => setSelectedDetail(null)}
+          title={
+            <Group gap="xs">
+              <Badge color="ptpn4Green.9" variant="filled" radius="sm">
+                {selectedDetail?.ticket_number}
+              </Badge>
+              <Text fw={800} size="md" c="slateClean.9">Detail Berkas Permohonan</Text>
+            </Group>
+          }
+          position="right"
+          size="md"
+          styles={{
+            header: { borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' },
+            content: { backgroundColor: '#ffffff' }
+          }}
+        >
+          {selectedDetail && (
+            <Stack gap="lg" mt="md">
+              {}
+              <Box p="sm" bg="slateClean.0" style={{ borderRadius: '8px' }}>
+                <Text size="xs" c="dimmed" fw={600} mb={4}>INFORMASI PENGAJU</Text>
+                <Text fw={700} size="sm" c="slateClean.8">{selectedDetail.profiles?.full_name}</Text>
+                <Text size="xs" c="slateClean.5">{selectedDetail.profiles?.division} • {selectedDetail.profiles?.email}</Text>
+              </Box>
+
+              {}
+              <Box>
+                <Text size="xs" c="dimmed" fw={600} mb={2}>JUDUL PERMOHONAN</Text>
+                <Text fw={700} size="md" c="slateClean.9" mb="xs">{selectedDetail.request_title}</Text>
+                <Badge color="blue" variant="light">{selectedDetail.categories?.name}</Badge>
+              </Box>
+
+              {}
+              <Box>
+                <Text size="xs" c="dimmed" fw={600} mb={4}>DESKRIPSI & KETERANGAN DOKUMEN</Text>
+                <Paper p="md" withBorder radius="md" bg="#f8fafc" style={{ borderColor: '#e2e8f0' }}>
+                  <Text size="sm" c="slateClean.7" style={{ whiteSpace: 'pre-line', lineHeight: '1.6' }}>
+                    {selectedDetail.description || 'Pengaju tidak menyertakan keterangan tertulis pada dokumen ini.'}
+                  </Text>
+                </Paper>
+              </Box>
+
+              {}
+              {selectedDetail.file_url && (
+                <Box>
+                  <Text size="xs" c="dimmed" fw={600} mb={4}>BERKAS LAMPIRAN FISIK</Text>
+                  <Button
+                    component="a"
+                    href={selectedDetail.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    variant="outline"
+                    color="ptpn4Green.9"
+                    fullWidth
+                    leftSection={<IconDownload size={16} />}
+                  >
+                    Buka / Unduh Dokumen PDF
+                  </Button>
+                </Box>
+              )}
+
+              {}
+              <Divider my="sm" label={<Text size="10px" fw={700} c="slateClean.4" lts="0.5px">RIWAYAT ALUR DOKUMEN</Text>} labelPosition="center" />
+
+              {loadingTimeline ? (
+                <Text size="xs" ta="center" c="dimmed" py="sm">Membaca jejak log birokrasi...</Text>
+              ) : (
+                <Timeline active={historyLogs.length - 1} bulletSize={18} lineWidth={1.5} color="ptpn4Green.9">
+                  {historyLogs.map((log, index) => {
+                    const isCurrentStatus = index === historyLogs.length - 1;
+
+                    return (
+                      <Timeline.Item
+                        key={log.id}
+                        title={
+                          <Text
+                            fw={700}
+                            size="xs"
+                            c={isCurrentStatus ? 'ptpn4Green.9' : 'slateClean.8'}
+                            style={{
+                              backgroundColor: isCurrentStatus ? '#ecfdf3' : 'transparent',
+                              padding: isCurrentStatus ? '2px 6px' : '0',
+                              borderRadius: isCurrentStatus ? '4px' : '0',
+                              display: 'inline-block'
+                            }}
+                          >
+                            {log.status_after}
+                          </Text>
+                        }
+                      >
+                        {log.notes && <Text size="11px" mt={2} c="slateClean.6" style={{ fontStyle: 'italic' }}>Keterangan: "{log.notes}"</Text>}
+                        <Text size="9px" c={isCurrentStatus ? 'green.7' : 'ptpn4Green.8'} fw={600} mt={4}>
+                          Oleh: {log.profiles?.full_name || 'System Auto'} • {new Date(log.created_at).toLocaleDateString('id-ID')}
+                        </Text>
+                      </Timeline.Item>
+                    );
+                  })}
+                </Timeline>
+              )}
+            </Stack>
+          )}
+        </Drawer>
 
         </AppShell.Main>
       </AppShell>

@@ -12,15 +12,17 @@ import {
 import { IconMail, IconLock, IconChecklist, IconAlertCircle, IconUser, IconBriefcase } from '@tabler/icons-react';
 
 const divisionData = [
-  { value: 'IT & ERP System', label: 'IT & ERP System' },
-  { value: 'Operasional Pabrik (PKS)', label: 'Operasional Pabrik (PKS)' },
-  { value: 'Tanaman & Budidaya', label: 'Tanaman & Budidaya' },
-  { value: 'Akuntansi & Keuangan', label: 'Akuntansi & Keuangan' },
-  { value: 'SDM', label: 'SDM' },
-  { value: 'Umum', label: 'Umum' },
-  { value: 'Pengadaan & Logistik', label: 'Pengadaan & Logistik' },
-  { value: 'Legal & Tata Kelola (GCG)', label: 'Legal & Tata Kelola (GCG)' },
-  { value: 'Manajemen Risiko (Risk Management)', label: 'Manajemen Risiko (Risk Management)' },
+  { value: 'Divisi Perencanaan Strategis', label: 'Divisi Perencanaan Strategis' },
+  { value: 'Divisi Transformasi & Keberlanjutan', label: 'Divisi Transformasi & Keberlanjutan' },
+  { value: 'Divisi Teknologi Informasi', label: 'Divisi Teknologi Informasi' },
+  { value: 'Divisi Keuangan & Akuntansi', label: 'Divisi Keuangan & Akuntansi' },
+  { value: 'Divisi Manajemen Risiko & GCG', label: 'Divisi Manajemen Risiko & GCG' },
+  { value: 'Divisi Pengembangan SDM & Budaya', label: 'Divisi Pengembangan SDM & Budaya' },
+  { value: 'Divisi Administrasi SDM & Hubungan Industrial', label: 'Divisi Administrasi SDM & Hubungan Industrial' },
+  { value: 'Divisi Umum', label: 'Divisi Umum' },
+  { value: 'Divisi Tanaman', label: 'Divisi Tanaman' },
+  { value: 'Divisi Teknik & Pengolahan', label: 'Divisi Teknik & Pengolahan' },
+  { value: 'Divisi Pemasaran & Sistem Manajemen', label: 'Divisi Pemasaran & Sistem Manajemen' },
 ];
 
 export default function RegisterPage() {
