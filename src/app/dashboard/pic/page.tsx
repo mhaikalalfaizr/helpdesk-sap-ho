@@ -486,6 +486,7 @@
     };
 
     const totalCount = requests.length;
+    const unassignedCount = requests.filter(r => r.status === 'Dikirim').length;
     const processCount = requests.filter(r => r.status.startsWith('Dalam Proses')).length;
     const holdCount = requests.filter(r => r.status.startsWith('Sedang Ditangguhkan')).length;
     const archivedCount = requests.filter(r => r.status === 'Disetujui' || r.status === 'Ditolak').length;
@@ -602,11 +603,21 @@
             </Stack>
           </Box>
 
-          <SimpleGrid cols={{ base: 1, sm: 4 }} spacing="lg" mb="xl">
+          <SimpleGrid cols={{ base: 1, sm: 5 }} spacing="lg" mb="xl">
             <Paper bg="ptpn4Green.9" p="xl" style={{ position: 'relative', color: '#fff' }}>
               <Text size="xs" fw={700} c="ptpn4Green.2" lts="0.5px">TOTAL TIKET MASUK</Text>
               <Text size="36px" fw={800} my="xs">{loading ? '...' : totalCount}</Text>
               <Text size="xs" c="ptpn4Green.1" fw={500}>Seluruh riwayat berkas</Text>
+            </Paper>
+
+            <Paper p="xl"> 
+              <Group justify="space-between" wrap="nowrap">
+                <Text size="xs" fw={700} c="slateClean.4" lts="0.5px">TIKET MENUNGGU RESPON</Text>
+              </Group>
+              <Text size="36px" fw={800} my="xs" c={unassignedCount > 0 ? "slateClean.9" : "slateClean.9"}>
+                {loading ? '...' : unassignedCount}
+              </Text>
+              <Text size="xs" c="#ef4444" fw={500}>Tiket belum diproses</Text>
             </Paper>
 
             <Paper p="xl">
@@ -630,7 +641,7 @@
 
           <Paper p="xl">
             {loading ? (
-              <Text size="sm" c="dimmed" ta="center" py="xl">Mengunduh data pengajuan dari Supabase...</Text>
+              <Text size="sm" c="dimmed" ta="center" py="xl">Mengambil data pengajuan...</Text>
             ) : (
 
               <Box>

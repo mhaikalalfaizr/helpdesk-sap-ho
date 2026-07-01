@@ -356,7 +356,7 @@ export default function UserDashboard() {
   const holdCount = myRequests.filter(r => r.status.startsWith('Sedang Ditangguhkan') || r.status.startsWith('Sedang Ditahan')).length;
   const archivedCount = myRequests.filter(r => r.status === 'Disetujui' || r.status === 'Ditolak').length;
 
-  if (loading || !userProfile) return <Text ta="center" mt="xl" c="dimmed" fw={500}>Memuat koordinat ruang kerja...</Text>;
+  if (loading || !userProfile) return <Text ta="center" mt="xl" c="dimmed" fw={500}>Memuat dashboard...</Text>;
 
   return (
     <AppShell
