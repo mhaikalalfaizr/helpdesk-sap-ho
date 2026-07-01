@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
-// Menginisialisasi Resend dengan API Key dari .env yang aman di server
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: Request) {
@@ -12,13 +11,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Email penerima wajib diisi' }, { status: 400 });
     }
 
-    // Template Konten Email HTML Dinamis
     const emailHtml = `
       <div style="font-family: sans-serif; padding: 20px; color: #334155; max-width: 600px; border: 1px solid #e2e8f0; border-radius: 8px;">
         <h2 style="color: #0e422a;">DocuTrack PalmCo Notification</h2>
         <p>Halo <strong>${recipientName}</strong>,</p>
         <p>Terdapat pembaruan status penting terkait pelacakan dokumen di sistem antrean pusat:</p>
-        
+
         <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
           <tr style="background-color: #f8fafc;">
             <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">No. Tiket</td>

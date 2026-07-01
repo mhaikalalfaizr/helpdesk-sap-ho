@@ -6,7 +6,7 @@ import { supabase } from '../../../lib/supabase';
 import { notifications } from '@mantine/notifications';
 import {
   AppShell, SimpleGrid, Paper, Text, Group, Badge, Avatar, Table, NavLink, Stack, Box, Kbd,
-  Tooltip, Modal, Timeline, FileInput, Textarea, Button, TextInput, Select, ActionIcon, Divider, Loader, Center
+  Tooltip, Modal, Timeline, FileInput, Textarea, Button, TextInput, Select, ActionIcon, Divider, Loader, Center, Drawer
 } from '@mantine/core';
 import {
   IconLayoutDashboard, IconFileText, IconSettings, IconLogout, IconSearch, IconBell, IconMail,
@@ -645,50 +645,82 @@ export default function UserDashboard() {
           </Box>
         )}
 
-        <Modal
+        <Drawer
           opened={selectedRequest !== null}
           onClose={() => setSelectedRequest(null)}
-          title={`Detail Alur Koordinat Tiket - ${selectedRequest?.ticket_number}`}
+          title={
+            <Group gap="xs">
+              <Badge color="ptpn4Green.9" variant="filled" radius="sm">
+                {selectedRequest?.ticket_number}
+              </Badge>
+              <Text fw={800} size="md" c="slateClean.9">Detail & Status Pelacakan</Text>
+            </Group>
+          }
+          position="right"
           size="md"
-          centered
-          radius="lg"
+          styles={{
+            header: { borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' },
+            content: { backgroundColor: '#ffffff' }
+          }}
         >
-          {loadingTimeline ? (
-            <Text size="sm" ta="center" my="md" c="dimmed">Membaca jejak dokumen...</Text>
-          ) : (
-            <Timeline active={historyLogs.length - 1} bulletSize={22} lineWidth={2} mt="md" color="ptpn4Green.9">
-              {historyLogs.map((log, index) => {
-                const isCurrentStatus = index === historyLogs.length - 1;
+          {selectedRequest && (
+            <Stack gap="lg" mt="md">
+              {}
+              <Box>
+                <Text size="xs" c="dimmed" fw={600} mb={2}>JUDUL PENGAJUAN SAYA</Text>
+                <Text fw={700} size="md" c="slateClean.9" mb="xs">{selectedRequest.request_title}</Text>
+                <Badge color="blue" variant="light">{selectedRequest.categories?.name}</Badge>
+              </Box>
 
-                return (
-                  <Timeline.Item
-                    key={log.id}
-                    title={
-                      <Text
-                        fw={700}
-                        size="sm"
-                        c={isCurrentStatus ? 'ptpn4Green.9' : 'slateClean.8'}
-                        style={{
-                          backgroundColor: isCurrentStatus ? '#ecfdf3' : 'transparent',
-                          padding: isCurrentStatus ? '4px 8px' : '0',
-                          borderRadius: isCurrentStatus ? '6px' : '0',
-                          display: 'inline-block'
-                        }}
+              <Box>
+                <Text size="xs" c="dimmed" fw={600} mb={4}>DESKRIPSI YANG DIAJUKAN</Text>
+                <Paper p="md" withBorder radius="md" bg="#f8fafc" style={{ borderColor: '#e2e8f0' }}>
+                  <Text size="sm" c="slateClean.7" style={{ whiteSpace: 'pre-line', lineHeight: '1.6' }}>
+                    {selectedRequest.description || 'Tidak ada deskripsi tertulis.'}
+                  </Text>
+                </Paper>
+              </Box>
+
+              <Divider my="sm" label={<Text size="10px" fw={700} c="slateClean.4" lts="0.5px">KRONOLOGI ALUR DOKUMEN</Text>} labelPosition="center" />
+
+              {loadingTimeline ? (
+                <Text size="xs" ta="center" c="dimmed" py="sm">Menjemput jejak log berkas...</Text>
+              ) : (
+                <Timeline active={historyLogs.length - 1} bulletSize={18} lineWidth={1.5} color="ptpn4Green.9">
+                  {historyLogs.map((log, index) => {
+                    const isCurrentStatus = index === historyLogs.length - 1;
+
+                    return (
+                      <Timeline.Item
+                        key={log.id}
+                        title={
+                          <Text
+                            fw={700}
+                            size="xs"
+                            c={isCurrentStatus ? 'ptpn4Green.9' : 'slateClean.8'}
+                            style={{
+                              backgroundColor: isCurrentStatus ? '#ecfdf3' : 'transparent',
+                              padding: isCurrentStatus ? '2px 6px' : '0',
+                              borderRadius: isCurrentStatus ? '4px' : '0',
+                              display: 'inline-block'
+                            }}
+                          >
+                            {log.status_after}
+                          </Text>
+                        }
                       >
-                        {log.status_after}
-                      </Text>
-                    }
-                  >
-                    {log.notes && <Text size="xs" mt={4} c="slateClean.6" style={{ fontStyle: 'italic' }}>Keterangan PIC: "{log.notes}"</Text>}
-                    <Text size="10px" c={isCurrentStatus ? 'green.7' : 'ptpn4Green.8'} fw={600} mt={6}>
-                      Oleh: {log.profiles?.full_name || 'Otomasi Sistem'} • {new Date(log.created_at).toLocaleString('id-ID')} WIB
-                    </Text>
-                  </Timeline.Item>
-                );
-              })}
-            </Timeline>
+                        {log.notes && <Text size="11px" mt={2} c="slateClean.6" style={{ fontStyle: 'italic' }}>Catatan: "{log.notes}"</Text>}
+                        <Text size="9px" c={isCurrentStatus ? 'green.7' : 'ptpn4Green.8'} fw={600} mt={4}>
+                          Oleh: {log.profiles?.full_name || 'Otomasi Sistem'} • {new Date(log.created_at).toLocaleDateString('id-ID')}
+                        </Text>
+                      </Timeline.Item>
+                    );
+                  })}
+                </Timeline>
+              )}
+            </Stack>
           )}
-        </Modal>
+        </Drawer>
 
       </AppShell.Main>
     </AppShell>
