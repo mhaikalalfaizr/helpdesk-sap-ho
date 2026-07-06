@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
@@ -11,18 +10,42 @@ import {
 } from '@mantine/core';
 import { IconMail, IconLock, IconChecklist, IconAlertCircle, IconUser, IconBriefcase } from '@tabler/icons-react';
 
-const divisionData = [
-  { value: 'Divisi Perencanaan Strategis', label: 'Divisi Perencanaan Strategis' },
-  { value: 'Divisi Transformasi & Keberlanjutan', label: 'Divisi Transformasi & Keberlanjutan' },
-  { value: 'Divisi Teknologi Informasi', label: 'Divisi Teknologi Informasi' },
-  { value: 'Divisi Keuangan & Akuntansi', label: 'Divisi Keuangan & Akuntansi' },
-  { value: 'Divisi Manajemen Risiko & GCG', label: 'Divisi Manajemen Risiko & GCG' },
-  { value: 'Divisi Pengembangan SDM & Budaya', label: 'Divisi Pengembangan SDM & Budaya' },
-  { value: 'Divisi Administrasi SDM & Hubungan Industrial', label: 'Divisi Administrasi SDM & Hubungan Industrial' },
-  { value: 'Divisi Umum', label: 'Divisi Umum' },
-  { value: 'Divisi Tanaman', label: 'Divisi Tanaman' },
-  { value: 'Divisi Teknik & Pengolahan', label: 'Divisi Teknik & Pengolahan' },
-  { value: 'Divisi Pemasaran & Sistem Manajemen', label: 'Divisi Pemasaran & Sistem Manajemen' },
+const locationData = [
+  { value: 'Head Office', label: 'Head Office (Kantor Pusat)' },
+  { value: 'Regional 1', label: 'Regional 1' },
+  { value: 'Regional 2', label: 'Regional 2' },
+  { value: 'Regional 3', label: 'Regional 3' },
+  { value: 'Regional 4', label: 'Regional 4' },
+  { value: 'Regional 5', label: 'Regional 5' },
+  { value: 'Regional 6', label: 'Regional 6' },
+  { value: 'Regional 7', label: 'Regional 7' },
+];
+
+const hoDivisionData = [
+  { value: 'Divisi Sekretariat Perusahaan', label: 'DSPN - Divisi Sekretariat Perusahaan' },
+  { value: 'Divisi Satuan Pengawasan Intern', label: 'DSPI - Divisi Satuan Pengawasan Intern' },
+  { value: 'Divisi Tanaman', label: 'DTAN - Divisi Tanaman' },
+  { value: 'Divisi Teknik dan Pengolahan', label: 'DTPL - Divisi Teknik dan Pengolahan' },
+  { value: 'Divisi Infrastruktur', label: 'DINF - Divisi Infrastruktur' },
+  { value: 'Divisi Investasi Tanaman dan Teknik Pengolahan', label: 'DITP - Divisi Investasi Tanaman dan Teknik Pengolahan' },
+  { value: 'Divisi Pemasaran', label: 'DPSN - Divisi Pemasaran' },
+  { value: 'Divisi Rantai Pasok dan Logistik', label: 'DRPL - Divisi Rantai Pasok dan Logistik' },
+  { value: 'Divisi Pengadaan', label: 'DPEN - Divisi Pengadaan' },
+  { value: 'Divisi Strategi Perusahaan dan Pengendalian Kinerja Anak Perusahaan', label: 'DSPK - Divisi Strategi Perusahaan dan Pengendalian Kinerja Anak Perusahaan' },
+  { value: 'Divisi Sistem Manajemen dan Sustainability', label: 'DSMS - Divisi Sistem Manajemen dan Sustainability' },
+  { value: 'Divisi Riset, Kemitraan Strategis dan Manajemen Aset', label: 'DRKM - Divisi Riset, Kemitraan Strategis dan Manajemen Aset' },
+  { value: 'Divisi Pengembangan Bisnis dan Hilirisasi', label: 'DPBH - Divisi Pengembangan Bisnis dan Hilirisasi' },
+  { value: 'Divisi Perbendaharaan, Anggaran dan Keuangan Strategis', label: 'DPAS - Divisi Perbendaharaan, Anggaran dan Keuangan Strategis' },
+  { value: 'Divisi Akuntansi dan Perpajakan', label: 'DAPN - Divisi Akuntansi dan Perpajakan' },
+  { value: 'Divisi Manajemen Risiko', label: 'DMRS - Divisi Manajemen Risiko' },
+  { value: 'Divisi Pengembangan SDM dan Budaya', label: 'DPSB - Divisi Pengembangan SDM dan Budaya' },
+  { value: 'Divisi Operasional SDM', label: 'DSDM - Divisi Operasional SDM' },
+  { value: 'Divisi HPS dan Umum', label: 'DHPU - Divisi HPS dan Umum' },
+  { value: 'Divisi Teknologi Informasi', label: 'DTIS - Divisi Teknologi Informasi' },
+  { value: 'Divisi Hubungan Kelembagaan dan TJSL', label: 'DHKT - Divisi Hubungan Kelembagaan dan TJSL' },
+  { value: 'Divisi Hukum', label: 'DHKM - Divisi Hukum' },
+  { value: 'Divisi PSR dan Plasma', label: 'DPSR - Divisi PSR dan Plasma' },
+  { value: 'Project Management Office', label: 'DPMO - Project Management Office' }
 ];
 
 export default function RegisterPage() {
@@ -30,6 +53,8 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+
+  const [unitKerja, setUnitKerja] = useState<string | null>('');
   const [division, setDivision] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -38,6 +63,16 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
+      if (!unitKerja || (unitKerja === 'Head Office' && !division)) {
+        notifications.show({
+          title: 'Data Belum Lengkap',
+          message: 'Harap pilih Unit Kerja dan Divisi Anda.',
+          color: 'orange'
+        });
+        setLoading(false);
+        return;
+      }
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -51,7 +86,8 @@ export default function RegisterPage() {
             id: authData.user.id,
             email,
             full_name: fullName,
-            division: division,
+            unit_kerja: unitKerja,
+            division: unitKerja === 'Head Office' ? division : ' ',
             role: 'User',
           },
         ]);
@@ -126,16 +162,20 @@ export default function RegisterPage() {
                 }}
               />
 
+              {}
               <Select
-                label="Divisi / Bagian"
-                placeholder="Pilih atau cari divisi"
-                data={divisionData}
+                label="Unit Kerja"
+                placeholder="Pilih atau cari unit kerja"
+                data={locationData}
                 searchable
                 clearable
-                nothingFoundMessage="Divisi tidak ditemukan.."
+                nothingFoundMessage="Unit kerja tidak ditemukan.."
                 required
-                value={division}
-                onChange={(value) => setDivision(value || '')}
+                value={unitKerja}
+                onChange={(value) => {
+                  setUnitKerja(value);
+                  setDivision('');
+                }}
                 leftSection={<IconBriefcase size={16} stroke={1.5} color="#94a3b8" />}
                 radius="md"
                 styles={{
@@ -149,6 +189,27 @@ export default function RegisterPage() {
                   },
                 }}
               />
+
+              {unitKerja === 'Head Office' && (
+                <Select
+                  label="Divisi"
+                  placeholder="Cari atau pilih divisi anda"
+                  data={hoDivisionData}
+                  searchable
+                  clearable
+                  nothingFoundMessage="Divisi tidak ditemukan.."
+                  required
+                  value={division}
+                  onChange={(value) => setDivision(value || '')}
+                  leftSection={<IconBriefcase size={16} stroke={1.5} color="#94a3b8" />}
+                  radius="md"
+                  styles={{
+                    label: { fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '4px' },
+                    input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' },
+                    dropdown: { backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }
+                  }}
+                />
+              )}
 
               <TextInput
                 label="Alamat Email"

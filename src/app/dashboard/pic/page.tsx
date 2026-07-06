@@ -6,11 +6,12 @@
   import { notifications } from '@mantine/notifications';
   import {
     AppShell, SimpleGrid, Paper, Text, Group, Badge, Avatar, Table, Menu, ActionIcon, TextInput,
-    NavLink, Stack, Box, Kbd, Tooltip, Modal, Timeline, FileInput, Textarea, Button, Drawer, Divider
+    NavLink, Stack, Box, Kbd, Tooltip, Modal, Timeline, FileInput, Textarea, Button, Drawer, Divider, Select
   } from '@mantine/core';
   import {
     IconLayoutDashboard, IconFileText, IconClock, IconChecklist, IconSettings, IconLogout, IconSearch, IconBell,
-    IconMail, IconDotsVertical, IconCheck, IconX, IconAlertCircle, IconArrowUpRight, IconDownload, IconEye
+    IconMail, IconDotsVertical, IconCheck, IconX, IconAlertCircle, IconArrowUpRight, IconDownload, IconEye, IconUserShare,
+    IconPlayerPause, IconPlayerPlay, IconArrowRight, IconFileCheck
   } from '@tabler/icons-react';
 
   interface RequestItem {
@@ -22,11 +23,13 @@
     total_hold_days: number;
     created_at: string;
     updated_at?: string | null;
-    profiles: { full_name: string; division: string; email?: string } | null;
+    profiles: { full_name: string; unit_kerja: string; division: string; email?: string } | null;
     categories: { name: string; sla_days: number } | null;
     file_url?: string | null;
     current_pic_id?: string | null;
     pic?: { full_name: string } | null;
+    attachments?: { id: string; file_name: string; file_url: string; type: string }[] | null;
+    urgency?: string | null;
   }
 
   interface HistoryLog {
@@ -71,6 +74,11 @@
     const [selectedDetail, setSelectedDetail] = useState<RequestItem | null>(null);
 
     const [holdReason, setHoldReason] = useState('');
+
+    const [picList, setPicList] = useState<{ value: string; label: string; email: string }[]>([]);
+    const [assignRequest, setAssignRequest] = useState<RequestItem | null>(null);
+    const [selectedNewPicId, setSelectedNewPicId] = useState<string | null>(null);
+    const [assigning, setAssigning] = useState(false);
 
     useEffect(() => {
       initPic();
@@ -122,14 +130,30 @@
       const { data } = await supabase
         .from('requests')
         .select(`
-          id, ticket_number, request_title, description, status, total_hold_days, created_at, updated_at, file_url, current_pic_id,
-          profiles:user_id (full_name, division, email),
+          id, ticket_number, request_title, description, status, total_hold_days, created_at, updated_at, file_url, current_pic_id, urgency,
+          profiles:user_id (full_name, unit_kerja, division, email),
           categories:category_id (name, sla_days),
-          pic:current_pic_id (full_name)
+          pic:current_pic_id (full_name),
+          attachments (id, file_name, file_url, type)
         `)
         .order('created_at', { ascending: false });
 
       if (data) setRequests(data as any);
+
+      const { data: allPics } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .eq('role', 'PIC')
+        .order('full_name', { ascending: true });
+
+      if (allPics) {
+        setPicList(allPics.map(p => ({
+          value: p.id,
+          label: p.full_name,
+          email: p.email || ''
+        })));
+      }
+
       setLoading(false);
     };
 
@@ -165,6 +189,98 @@
 
       if (data) setHistoryLogs(data as any);
       setLoadingTimeline(false);
+    };
+
+    const handleAssignPic = async () => {
+      if (!assignRequest) return;
+      setAssigning(true);
+
+      try {
+        const previousPicName = assignRequest.pic?.full_name || 'Belum Ditentukan';
+        const newPicTarget = picList.find(p => p.value === selectedNewPicId);
+        const newPicName = newPicTarget ? newPicTarget.label : 'Belum Ditentukan (Unassigned)';
+
+        const { error: updateError } = await supabase
+          .from('requests')
+          .update({
+            current_pic_id: selectedNewPicId,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', assignRequest.id);
+
+        if (updateError) throw updateError;
+
+        const logNotes = `Tiket dialihkan oleh ${currentUserName} dari [${previousPicName}] ke [${newPicName}]`;
+        await supabase.from('request_logs').insert([
+          {
+            request_id: assignRequest.id,
+            changed_by: currentPicId,
+            status_before: assignRequest.status,
+            status_after: assignRequest.status,
+            notes: logNotes
+          }
+        ]);
+
+        const emailPayloads = [];
+
+        if (assignRequest.profiles?.email) {
+          emailPayloads.push({
+            recipientEmail: assignRequest.profiles.email,
+            recipientName: assignRequest.profiles.full_name,
+            notes: `Penanggung jawab tiket Anda telah diperbarui menjadi: ${newPicName}.`
+          });
+        }
+
+        if (newPicTarget && selectedNewPicId !== currentPicId) {
+          emailPayloads.push({
+            recipientEmail: newPicTarget.email,
+            recipientName: newPicTarget.label,
+            notes: `Anda telah ditunjuk oleh ${currentUserName} untuk menangani tiket ini.`
+          });
+        }
+
+        emailPayloads.push({
+          recipientEmail: 'mhasticmusic@gmail.com',
+          recipientName: 'Monitoring System',
+          notes: logNotes
+        });
+
+        await Promise.all(
+          emailPayloads.map(payload =>
+            fetch('/api/send-email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                ticketNumber: assignRequest.ticket_number,
+                title: assignRequest.request_title,
+                status: assignRequest.status,
+                notes: payload.notes,
+                recipientEmail: payload.recipientEmail,
+                recipientName: payload.recipientName
+              }),
+            }).catch(e => console.error('Gagal kirim sub-email delegasi:', e))
+          )
+        );
+
+        setRequests(prev => prev.map(r => r.id === assignRequest.id ? {
+          ...r,
+          current_pic_id: selectedNewPicId,
+          pic: newPicTarget ? { full_name: newPicTarget.label } : null
+        } : r));
+
+        notifications.show({
+          title: 'Delegasi Berhasil',
+          message: `Tiket ${assignRequest.ticket_number} sukses ditugaskan ke ${newPicName}.`,
+          color: 'green'
+        });
+
+        setAssignRequest(null);
+        setSelectedNewPicId(null);
+      } catch (err: any) {
+        notifications.show({ title: 'Gagal Mengalihkan Penugasan Tiket', message: err.message, color: 'red' });
+      } finally {
+        setAssigning(false);
+      }
     };
 
     const updateDatabaseStatus = async (id: string, payload: any, logStatusName: string, notes: string = 'Sinkronisasi status birokrasi manual oleh PIC') => {
@@ -473,12 +589,21 @@
     const calculateTotalSlaDays = (createdAtString: string, status: string, newTotalHoldDays: number, updatedAtString?: string | null) => {
       const created = new Date(createdAtString).getTime();
       const isFinal = status === 'Disetujui' || status === 'Ditolak';
+      const isCurrentlyHold = status.startsWith('Sedang Ditangguhkan di');
 
       const endTime = (isFinal && updatedAtString)
         ? new Date(updatedAtString).getTime()
         : new Date().getTime();
 
       const totalElapsedDays = Math.floor((endTime - created) / (1000 * 60 * 60 * 24));
+
+      let finalHoldDays = newTotalHoldDays || 0;
+
+      if (isCurrentlyHold && updatedAtString) {
+        const holdStart = new Date(updatedAtString).getTime();
+        const currentHoldDuration = Math.floor((new Date().getTime() - holdStart) / (1000 * 60 * 60 * 24));
+        finalHoldDays += currentHoldDuration;
+      }
 
       const netSlaDays = totalElapsedDays - (newTotalHoldDays || 0);
 
@@ -610,7 +735,7 @@
               <Text size="xs" c="ptpn4Green.1" fw={500}>Seluruh riwayat berkas</Text>
             </Paper>
 
-            <Paper p="xl"> 
+            <Paper p="xl">
               <Group justify="space-between" wrap="nowrap">
                 <Text size="xs" fw={700} c="slateClean.4" lts="0.5px">TIKET MENUNGGU RESPON</Text>
               </Group>
@@ -655,25 +780,25 @@
                   styles={{ input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' } }}
                 />
 
-              <Table verticalSpacing="md" horizontalSpacing="md" highlightOnHover variant="simple">
+              <Table verticalSpacing="md" horizontalSpacing="md" highlightOnHover variant="simple" striped>
                 <Table.Thead bg="slateClean.0">
                   <Table.Tr>
-                    <Table.Th style={{ borderBottom: '1px solid #e2e8f0', cursor: 'pointer' }} onClick={() => handleSortRequest('ticket')}>
+                    <Table.Th style={{ borderBottom: '1px solid #e2e8f0', cursor: 'pointer' }} onClick={() => handleSortRequest('ticket')} w={230}>
                       <Text size="xs" fw={700} c="slateClean.5">NO. TIKET{renderSortArrow('ticket')}</Text>
                     </Table.Th>
-                    <Table.Th style={{ borderBottom: '1px solid #e2e8f0', cursor: 'pointer' }} onClick={() => handleSortRequest('applicant')}>
+                    <Table.Th style={{ borderBottom: '1px solid #e2e8f0', cursor: 'pointer' }} onClick={() => handleSortRequest('applicant')} w={320}>
                       <Text size="xs" fw={700} c="slateClean.5">PENGAJU{renderSortArrow('applicant')}</Text>
                     </Table.Th>
-                    <Table.Th style={{ borderBottom: '1px solid #e2e8f0', cursor: 'pointer' }} onClick={() => handleSortRequest('title')}>
+                    <Table.Th style={{ borderBottom: '1px solid #e2e8f0', cursor: 'pointer' }} onClick={() => handleSortRequest('title')} w={250}>
                       <Text size="xs" fw={700} c="slateClean.5">JUDUL / JENIS{renderSortArrow('title')}</Text>
                     </Table.Th>
-                    <Table.Th style={{ borderBottom: '1px solid #e2e8f0', cursor: 'pointer' }} onClick={() => handleSortRequest('duration')}>
+                    <Table.Th style={{ borderBottom: '1px solid #e2e8f0', cursor: 'pointer' }} onClick={() => handleSortRequest('duration')} w={180}>
                       <Text size="xs" fw={700} c="slateClean.5">DURASI{renderSortArrow('duration')}</Text>
                     </Table.Th>
-                    <Table.Th style={{ borderBottom: '1px solid #e2e8f0', cursor: 'pointer' }} onClick={() => handleSortRequest('status')}>
+                    <Table.Th style={{ borderBottom: '1px solid #e2e8f0', cursor: 'pointer' }} onClick={() => handleSortRequest('status')} w={300}>
                       <Text size="xs" fw={700} c="slateClean.5">STATUS{renderSortArrow('status')}</Text>
                     </Table.Th>
-                    <Table.Th style={{ borderBottom: '1px solid #e2e8f0' }} w={320}>
+                    <Table.Th style={{ borderBottom: '1px solid #e2e8f0' }} w={270}>
                       <Text size="xs" fw={900} c="slateClean.5">AKSI</Text>
                     </Table.Th>
                   </Table.Tr>
@@ -701,10 +826,16 @@
                     const isHoldState = req.status.startsWith('Sedang Ditangguhkan di');
                     const canHold = req.status.includes('PIC') || req.status.includes('Head Office') || req.status.includes('Holding') || req.status.includes('Konsultan') || req.status.startsWith('Dalam Proses oleh');
                     const isLockedByOtherPic = req.current_pic_id && req.current_pic_id !== currentPicId;
+                    const getUrgencyColor = (urgency: string) => {
+                      if (urgency === 'Tinggi') return 'red';
+                      if (urgency === 'Sedang') return 'orange';
+                      return 'gray';
+                    };
 
                     return (
                       <Table.Tr key={req.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <Table.Td>
+                          <Stack gap={2} align="flex-start">
                           <Tooltip label="Klik untuk melihat riwayat pengajuan" position="top" withArrow>
                             <Text
                               fw={700}
@@ -716,11 +847,25 @@
                               {req.ticket_number} 📋
                             </Text>
                           </Tooltip>
+                      
+                        <Badge
+                            color={getUrgencyColor(req.urgency || 'Sedang')}
+                            variant="filled"
+                            size="xs"
+                            styles={{ root: { textTransform: 'none', height: '17px', padding: '0 4px' } }}
+                          >
+                            {req.urgency || 'Sedang'}
+                        </Badge>
+                        </Stack>
                         </Table.Td>
 
                         <Table.Td>
                           <Text size="sm" fw={600} c="slateClean.8">{req.profiles?.full_name || 'Tanpa Nama'}</Text>
-                          <Text size="xs" c="dimmed">{req.profiles?.division || 'Divisi Umum'}</Text>
+                          <Text size="xs" c="dimmed">
+                            {req.profiles?.unit_kerja === 'Head Office'
+                            ? `${req.profiles.unit_kerja} | ${req.profiles.division || ''}`
+                            : (req.profiles?.unit_kerja || 'Lokasi Kerja')}
+                          </Text>
                         </Table.Td>
 
                         <Table.Td>
@@ -741,7 +886,16 @@
 
                         <Table.Td>
                           <Badge
-                            color={isHoldState ? 'orange' : req.status === 'Disetujui' ? 'green' : req.status === 'Ditolak' ? 'red' : 'blue'}
+                            color={
+                              isHoldState
+                              ? 'orange'
+                              : req.status === 'Disetujui'
+                              ? 'green'
+                              : req.status === 'Ditolak'
+                              ? 'red'
+                              : req.status === 'Dikirim'
+                              ? 'cyan'
+                              : 'blue'}
                             variant="light"
                             radius="sm"
                             py="md"
@@ -758,18 +912,17 @@
                                 Pengajuan Selesai Diproses
                               </Text>
                             ) : isLockedByOtherPic ? (
-                              <Badge color="gray.4" variant="outline" radius="sm" c="dimmed" size="sm" fw="500" style={{ borderStyle: 'dashed', textTransform: 'none' }}>
+                              <Badge color="gray.4" variant="outline" radius="sm" c="dimmed" size="md" fw="500" style={{ borderStyle: 'dashed', textTransform: 'none' }}>
                                 🔒 Ditangani oleh {req.pic?.full_name}
                               </Badge>
                             ) : (
                               <>
                                 <Tooltip label={req.status === 'Dalam Proses oleh Konsultan' ? 'Upload Form_Final & Setujui Berkas' : 'Lanjutkan proses ke tahap berikutnya'} position="top" withArrow>
-                                  <Button
-                                    size="xs"
+                                  <ActionIcon
+                                    size="md"
                                     variant="light"
                                     color="green"
                                     disabled={isHoldState}
-                                    leftSection={<IconCheck size={14} />}
                                     onClick={() => {
                                       if (req.status === 'Dalam Proses oleh Konsultan') {
                                         handleNextStep(req);
@@ -778,34 +931,47 @@
                                       }
                                     }}
                                   >
-                                    {req.status === 'Dalam Proses oleh Konsultan' ? 'Selesai' : 'Proses'}
-                                  </Button>
+                                    {req.status === 'Dalam Proses oleh Konsultan' ? <IconFileCheck size={18} /> : <IconArrowRight size={18} />}
+                                  </ActionIcon>
+                                </Tooltip>
+
+                                <Tooltip label="Delegasikan ke PIC lain" position="top" withArrow>
+                                  <ActionIcon
+                                    size="md"
+                                    variant="light"
+                                    color="indigo"
+                                    onClick={() => {
+                                      setAssignRequest(req);
+                                      if (req.current_pic_id) {
+                                        setSelectedNewPicId(req.current_pic_id);
+                                      }
+                                    }}
+                                  > <IconUserShare size={18} />
+                                  </ActionIcon>
                                 </Tooltip>
 
                                 {canHold && (
-                                  <Tooltip label={isHoldState ? 'Lanjutkan proses ke tahap selanjutnya' : 'Tangguhkan pengajuan sementara'} position="top" withArrow>
-                                    <Button
-                                      size="xs"
+                                  <Tooltip label={isHoldState ? 'Lanjutkan proses ke tahap selanjutnya' : 'Tangguhkan sementara'} position="top" withArrow>
+                                    <ActionIcon
+                                      size="md"
                                       variant="light"
                                       color="orange"
-                                      leftSection={<IconAlertCircle size={14} />}
                                       onClick={() => setConfirmHoldRequest(req)}
                                     >
-                                      {isHoldState ? 'Lanjutkan' : 'Tangguhkan'}
-                                    </Button>
+                                      {isHoldState ? <IconPlayerPlay size={18} /> : <IconPlayerPause size={18} />}
+                                    </ActionIcon>
                                   </Tooltip>
                                 )}
 
-                                <Tooltip label="Tolak pengajuan secara permanen" position="top" withArrow>
-                                  <Button
-                                    size="xs"
+                                <Tooltip label="Tolak secara permanen" position="top" withArrow>
+                                  <ActionIcon
+                                    size="md"
                                     variant="light"
                                     color="red"
-                                    leftSection={<IconX size={14} />}
                                     onClick={() => setRejectRequest(req)}
                                   >
-                                    Tolak
-                                  </Button>
+                                    <IconX size={18} />
+                                  </ActionIcon>
                                 </Tooltip>
                               </>
                             )}
@@ -990,6 +1156,45 @@
           </Stack>
         </Modal>
 
+        <Modal
+          opened={assignRequest !== null}
+          onClose={() => { setAssignRequest(null); setSelectedNewPicId(null); }}
+          title={<Text fw={700}>Delegasikan Penanggung Jawab Tiket</Text>}
+          centered
+          radius="lg"
+        >
+          <Stack gap="md">
+            <Text size="sm" c="slateClean.7">
+              Pilih staff PIC dari daftar di bawah ini untuk menangani tiket nomor <b>{assignRequest?.ticket_number}</b>.
+            </Text>
+
+            <Select
+              label="Pilih Penanggung Jawab (PIC)"
+              placeholder="Cari nama staff PIC..."
+              data={picList}
+              searchable
+              clearable
+              value={selectedNewPicId}
+              onChange={setSelectedNewPicId}
+              radius="md"
+            />
+
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={() => { setAssignRequest(null); setSelectedNewPicId(null); }} radius="md">
+                Batal
+              </Button>
+              <Button
+                color="indigo.8"
+                loading={assigning}
+                onClick={handleAssignPic}
+                radius="md"
+              >
+                Simpan Perubahan
+              </Button>
+            </Group>
+          </Stack>
+        </Modal>
+
         <Drawer
           opened={selectedDetail !== null}
           onClose={() => setSelectedDetail(null)}
@@ -998,7 +1203,7 @@
               <Badge color="ptpn4Green.9" variant="filled" radius="sm">
                 {selectedDetail?.ticket_number}
               </Badge>
-              <Text fw={800} size="md" c="slateClean.9">Detail Berkas Permohonan</Text>
+              <Text fw={800} size="md" c="slateClean.9">Detail Berkas Pengajuan</Text>
             </Group>
           }
           position="right"
@@ -1014,12 +1219,17 @@
               <Box p="sm" bg="slateClean.0" style={{ borderRadius: '8px' }}>
                 <Text size="xs" c="dimmed" fw={600} mb={4}>INFORMASI PENGAJU</Text>
                 <Text fw={700} size="sm" c="slateClean.8">{selectedDetail.profiles?.full_name}</Text>
-                <Text size="xs" c="slateClean.5">{selectedDetail.profiles?.division} • {selectedDetail.profiles?.email}</Text>
+                <Text size="xs" c="slateClean.5">
+                  {selectedDetail.profiles?.unit_kerja === 'Head Office'
+                    ? `${selectedDetail.profiles.unit_kerja} | ${selectedDetail.profiles.division || ''}`
+                    : (selectedDetail.profiles?.unit_kerja || 'Lokasi Kerja')}
+                  {selectedDetail.profiles?.email ? ` • ${selectedDetail.profiles.email}` : ''}
+                </Text>
               </Box>
 
               {}
               <Box>
-                <Text size="xs" c="dimmed" fw={600} mb={2}>JUDUL PERMOHONAN</Text>
+                <Text size="xs" c="dimmed" fw={600} mb={2}>JUDUL PENGAJUAN</Text>
                 <Text fw={700} size="md" c="slateClean.9" mb="xs">{selectedDetail.request_title}</Text>
                 <Badge color="blue" variant="light">{selectedDetail.categories?.name}</Badge>
               </Box>
@@ -1035,22 +1245,53 @@
               </Box>
 
               {}
-              {selectedDetail.file_url && (
+              {selectedDetail.attachments && selectedDetail.attachments.filter((a: any) => a.type === 'Form_Awal').length > 0 ? (
                 <Box>
-                  <Text size="xs" c="dimmed" fw={600} mb={4}>BERKAS LAMPIRAN FISIK</Text>
-                  <Button
-                    component="a"
-                    href={selectedDetail.file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    variant="outline"
-                    color="ptpn4Green.9"
-                    fullWidth
-                    leftSection={<IconDownload size={16} />}
-                  >
-                    Buka / Unduh Dokumen PDF
-                  </Button>
+                  <Text size="xs" c="dimmed" fw={600} mb={4}>
+                    BERKAS LAMPIRAN AWAL ({selectedDetail.attachments.filter((a: any) => a.type === 'Form_Awal').length} Berkas)
+                  </Text>
+                  <Stack gap="xs">
+                    {selectedDetail.attachments
+                      .filter((att: any) => att.type === 'Form_Awal')
+                      .map((file: any, idx: number) => (
+                        <Button
+                          key={file.id || idx}
+                          component="a"
+                          href={file.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          variant="outline"
+                          color="ptpn4Green.9"
+                          fullWidth
+                          leftSection={<IconDownload size={16} />}
+                          styles={{ inner: { justifyContent: 'flex-start' } }}
+                        >
+                          <Text size="xs" truncate style={{ maxWidth: '90%' }}>
+                            {file.file_name || `Unduh Berkas Lampiran ${idx + 1}`}
+                          </Text>
+                        </Button>
+                      ))}
+                  </Stack>
                 </Box>
+              ) : (
+
+                selectedDetail.file_url && (
+                  <Box>
+                    <Text size="xs" c="dimmed" fw={600} mb={4}>BERKAS LAMPIRAN AWAL</Text>
+                    <Button
+                      component="a"
+                      href={selectedDetail.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      variant="outline"
+                      color="ptpn4Green.9"
+                      fullWidth
+                      leftSection={<IconDownload size={16} />}
+                    >
+                      Buka Dokumen PDF
+                    </Button>
+                  </Box>
+                )
               )}
 
               {}

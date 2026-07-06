@@ -32,6 +32,8 @@ interface MyRequestItem {
   categories: { name: string; sla_days: number } | null;
   pic?: { full_name: string } | null;
   file_url?: string | null;
+  current_pic_id?: string | null;
+  urgency?: string | null;
 }
 
 interface HistoryLog {
@@ -55,7 +57,7 @@ export default function UserDashboard() {
   const [categoryId, setCategoryId] = useState<string>('');
   const [requestTitle, setRequestTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [formLoading, setFormLoading] = useState(false);
 
   const [selectedRequest, setSelectedRequest] = useState<MyRequestItem | null>(null);
@@ -66,6 +68,8 @@ export default function UserDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortKey, setSortKey] = useState<string | null>('date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>('desc');
+
+  const [urgency, setUrgency] = useState<string | null>(null);
 
   useEffect(() => {
     initDashboard();
@@ -134,7 +138,7 @@ export default function UserDashboard() {
     const { data } = await supabase
       .from('requests')
       .select(`
-        id, ticket_number, request_title, description, status, total_hold_days, created_at, updated_at, file_url,
+        id, ticket_number, request_title, description, status, total_hold_days, created_at, updated_at, file_url, urgency,
         user_profile:user_id (full_name, division, email),
         categories:category_id (name, sla_days),
         pic:current_pic_id (full_name),
@@ -173,7 +177,7 @@ export default function UserDashboard() {
     e.preventDefault();
     if (!userProfile || !categoryId) return;
 
-    if (!file) {
+    if (files.length === 0) {
       notifications.show({
         title: 'Berkas Wajib Dilampirkan',
         message: 'Silakan unggah berkas formulir dalam format PDF terlebih dahulu.',
@@ -186,21 +190,30 @@ export default function UserDashboard() {
     setFormLoading(true);
 
     try {
+      const ticketNumber = generateTicketNumber();
+      const uploadedAttachments: { file_name: string; file_url: string; type: string }[] = [];
+
       let uploadedFileUrl = '';
 
-      if (file) {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${userProfile.id}-${Date.now()}.${fileExt}`;
+      for (const currentFile of files) {
+        const fileExt = currentFile.name.split('.').pop();
+        const randomNonce = Math.random().toString(36).substring(7);
+        const fileName = `${userProfile.id}-${Date.now()}-${randomNonce}.${fileExt}`;
         const filePath = `user_docs/${fileName}`;
 
-        const { error: uploadError } = await supabase.storage.from('documents').upload(filePath, file);
+        const { error: uploadError } = await supabase.storage.from('documents').upload(filePath, currentFile);
         if (uploadError) throw uploadError;
 
         const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(filePath);
-        uploadedFileUrl = publicUrl;
+        
+        uploadedAttachments.push({
+          file_name: currentFile.name,
+          file_url: publicUrl,
+          type: 'Form_Awal' 
+        });
       }
 
-      const ticketNumber = generateTicketNumber();
+      const primaryFileUrl = uploadedAttachments[0]?.file_url || '';
 
       const { data: newRequest, error: insertError } = await supabase
         .from('requests')
@@ -212,14 +225,32 @@ export default function UserDashboard() {
             request_title: requestTitle,
             description: description,
             status: 'Dikirim',
-            file_url: uploadedFileUrl,
+            file_url: primaryFileUrl,
             total_hold_days: 0,
+            urgency: urgency,
           },
         ])
         .select()
         .single();
 
       if (insertError) throw insertError;
+
+      if (uploadedAttachments.length > 0) {
+        const attachmentsPayload = uploadedAttachments.map((att) => ({
+          request_id: newRequest.id,
+          file_name: att.file_name,
+          file_url: att.file_url,
+          uploaded_by: userProfile.id,
+          type: att.type
+        }));
+
+        const { error: attachError } = await supabase.from('attachments').insert(attachmentsPayload);
+        if (attachError) throw attachError;
+      }
+
+      await supabase.from('request_logs').insert([
+        { request_id: newRequest.id, changed_by: userProfile.id, status_before: null, status_after: 'Dikirim', notes: 'Dokumen berhasil diajukan ke antrean pusat' }
+      ]);
 
       try {
         await fetch('/api/send-email', {
@@ -237,10 +268,6 @@ export default function UserDashboard() {
       } catch (emailErr) {
         console.error('Gagal mengirim email konfirmasi tiket baru:', emailErr);
       }
-
-      await supabase.from('request_logs').insert([
-        { request_id: newRequest.id, changed_by: userProfile.id, status_before: null, status_after: 'Dikirim', notes: 'Dokumen berhasil diajukan ke antrean pusat' }
-      ]);
 
       try {
         await fetch('/api/send-email', {
@@ -260,7 +287,7 @@ export default function UserDashboard() {
       }
 
       notifications.show({
-        title: 'Permohonan Berhasil Dikirim',
+        title: 'Pengajuan Berhasil Dikirim',
         message: `Nomor tiket ${ticketNumber} telah sukses masuk ke sistem antrean PIC.`,
         color: 'green',
         autoClose: 5000,
@@ -269,13 +296,14 @@ export default function UserDashboard() {
       setRequestTitle('');
       setDescription('');
       setCategoryId('');
-      setFile(null);
+      setFiles([]);
 
       fetchUserRequests(userProfile.id);
       setActiveMenu(1);
+
     } catch (error: any) {
       notifications.show({
-        title: 'Gagal Membuat Permohonan',
+        title: 'Gagal Membuat Pengajuan',
         message: error.message,
         color: 'red',
       });
@@ -292,7 +320,8 @@ export default function UserDashboard() {
   const getStatusColor = (status: string) => {
     if (status.startsWith('Sedang Ditangguhkan') || status.startsWith('Sedang Ditahan')) return 'orange';
     if (status === 'Disetujui' || status === 'Disetujui Seluruh Pihak') return 'green';
-    if (status === 'Ditolak') return 'red';
+    if (status === 'Ditolak') return 'red'
+    if (status === 'Dikirim') return 'cyan';
     return 'blue';
   };
 
@@ -340,15 +369,28 @@ export default function UserDashboard() {
     return <Text component="span" size="xs" c="ptpn4Green.9" ml={5}> ▼</Text>;
   };
 
-  const calculateTotalSlaDays = (createdAtString: string, status: string, totalHoldDays: number, updatedAtString?: string | null) => {
+  const calculateTotalSlaDays = (createdAtString: string, status: string, newTotalHoldDays: number, updatedAtString?: string | null) => {
     const created = new Date(createdAtString).getTime();
-    const isFinal = status === 'Disetujui' || status === 'Ditolak';
-    const endTime = (isFinal && updatedAtString) ? new Date(updatedAtString).getTime() : new Date().getTime();
+      const isFinal = status === 'Disetujui' || status === 'Ditolak';
+      const isCurrentlyHold = status.startsWith('Sedang Ditangguhkan di');
 
-    const totalElapsedDays = Math.floor((endTime - created) / (1000 * 60 * 60 * 24));
-    const netSlaDays = totalElapsedDays - (totalHoldDays || 0);
+      const endTime = (isFinal && updatedAtString)
+        ? new Date(updatedAtString).getTime()
+        : new Date().getTime();
 
-    return netSlaDays <= 0 ? '1 Hari' : `${netSlaDays} Hari`;
+      const totalElapsedDays = Math.floor((endTime - created) / (1000 * 60 * 60 * 24));
+
+      let finalHoldDays = newTotalHoldDays || 0;
+
+      if (isCurrentlyHold && updatedAtString) {
+        const holdStart = new Date(updatedAtString).getTime(); 
+        const currentHoldDuration = Math.floor((new Date().getTime() - holdStart) / (1000 * 60 * 60 * 24));
+        finalHoldDays += currentHoldDuration;
+      }
+
+      const netSlaDays = totalElapsedDays - (newTotalHoldDays || 0);
+
+      return netSlaDays <= 0 ? '1 Hari' : `${netSlaDays} Hari`;
   };
 
   const totalCount = myRequests.length;
@@ -455,10 +497,23 @@ export default function UserDashboard() {
                   />
                   <TextInput
                     label="Judul Pengajuan"
-                    placeholder="Contoh: Permohonan Akses Akun SAP"
+                    placeholder="Contoh: Pengajuan Akses Akun SAP"
                     required
                     value={requestTitle}
                     onChange={(e) => setRequestTitle(e.target.value)}
+                    radius="md"
+                  />
+                  <Select
+                    label="Tingkat Urgensi"
+                    placeholder="Pilih tingkat urgensi dokumen"
+                    data={[
+                      { value: 'Rendah', label: '🟢 Rendah (Biasa)' },
+                      { value: 'Sedang', label: '🟡 Sedang (Butuh Perhatian)' },
+                      { value: 'Tinggi', label: '🔴 Tinggi (Prioritas Utama)' },
+                    ]}
+                    required
+                    value={urgency}
+                    onChange={setUrgency}
                     radius="md"
                   />
                   <Textarea
@@ -466,6 +521,7 @@ export default function UserDashboard() {
                     placeholder="Berikan deskripsi secara singkat dan jelas"
                     rows={5}
                     value={description}
+                    required
                     onChange={(e) => setDescription(e.target.value)}
                     radius="md"
                   />
@@ -474,9 +530,10 @@ export default function UserDashboard() {
                     placeholder="Pilih berkas formulir"
                     required
                     withAsterisk
-                    value={file}
-                    onChange={setFile}
+                    value={files}
+                    onChange={setFiles}
                     accept="application/pdf"
+                    multiple
                     radius="md"
                   />
                   <Button type="submit" loading={formLoading} color="ptpn4Green.9" fullWidth mt="lg" size="md" radius="md">
@@ -531,7 +588,7 @@ export default function UserDashboard() {
                 styles={{ input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' } }}
               />
 
-              <Table verticalSpacing="md" horizontalSpacing="md" highlightOnHover variant="simple">
+              <Table verticalSpacing="md" horizontalSpacing="md" highlightOnHover variant="simple" striped>
                 <Table.Thead bg="slateClean.0">
                   <Table.Tr>
                     <Table.Th style={{ cursor: 'pointer' }} w={250} onClick={() => handleSortRequest('ticket')}>
@@ -543,10 +600,10 @@ export default function UserDashboard() {
                     <Table.Th>
                       <Text size="xs" fw={700} c="slateClean.5">DURASI</Text>
                     </Table.Th>
-                    <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSortRequest('date')}>
+                    <Table.Th w={230}style={{ cursor: 'pointer' }} onClick={() => handleSortRequest('date')}>
                       <Text size="xs" fw={700} c="slateClean.5">TANGGAL KIRIM{renderSortArrow('date')}</Text>
                     </Table.Th>
-                    <Table.Th w={220}>
+                    <Table.Th w={280}>
                       <Text size="xs" fw={700} c="slateClean.5">PIC</Text>
                     </Table.Th>
                     <Table.Th w={300} style={{ cursor: 'pointer' }} onClick={() => handleSortRequest('status')}>
@@ -573,6 +630,7 @@ export default function UserDashboard() {
                       return (
                         <Table.Tr key={req.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <Table.Td>
+                            <Stack gap={2} align="flex-start">
                             <Tooltip label="Klik untuk melihat riwayat pengajuan" position="top" withArrow>
                               <Text
                                 fw={700}
@@ -584,6 +642,16 @@ export default function UserDashboard() {
                                 {req.ticket_number} 📋
                               </Text>
                             </Tooltip>
+
+                            <Badge 
+                              color={req.urgency === 'Tinggi' ? 'red' : req.urgency === 'Sedang' ? 'orange' : 'gray'} 
+                              variant="filled" 
+                              size="xs"
+                              styles={{ root: { textTransform: 'none', height: '17px', padding: '0 4px' } }}
+                            >
+                              {req.urgency || 'Sedang'}
+                            </Badge>
+                          </Stack>
                           </Table.Td>
 
                           <Table.Td>
@@ -695,22 +763,33 @@ export default function UserDashboard() {
                 </Paper>
               </Box>
 
-              {selectedRequest.file_url && (
-                <Box>
-                  <Text size="xs" c="dimmed" fw={600} mb={4}>LAMPIRAN BERKAS</Text>
-                  <Button
-                    component="a"
-                    href={selectedRequest.file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    variant="outline"
-                    color="ptpn4Green.9"
-                    fullWidth
-                    leftSection={<IconDownload size={16} />}
-                  >
-                    Unduh Form Pengajuan Anda
-                  </Button>
-                </Box>
+              {selectedRequest.attachments && selectedRequest.attachments.length > 0 && (
+              <Box>
+                <Text size="xs" c="dimmed" fw={600} mb={4}>LAMPIRAN BERKAS AWAL ({selectedRequest.attachments.filter((a: any) => a.type === 'Form_Awal').length} File)</Text>
+                <Stack gap="xs">
+                  {selectedRequest.attachments
+                    .filter((att: any) => att.type === 'Form_Awal')
+                    .map((file: any, idx: number) => (
+                      <Button
+                        key={file.id || idx}
+                        component="a"
+                        href={file.file_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        variant="outline"
+                        color="ptpn4Green.9"
+                        fullWidth
+                        leftSection={<IconDownload size={16} />}
+                        styles={{ inner: { justifyContent: 'flex-start' } }}
+                      >
+                        <Text size="xs" truncate style={{ maxWidth: '90%' }}>
+                          {file.file_name || `Unduh Berkas Lampiran ${idx + 1}`}
+                        </Text>
+                      </Button>
+                    ))}
+                </Stack>
+              </Box>
+
               )}
 
               <Divider my="sm" label={<Text size="10px" fw={700} c="slateClean.4" lts="0.5px">RIWAYAT ALUR DOKUMEN</Text>} labelPosition="center" />
