@@ -241,27 +241,30 @@
           });
         }
 
-        emailPayloads.push({
-          recipientEmail: 'mhasticmusic@gmail.com',
-          recipientName: 'Monitoring System',
-          notes: logNotes
-        });
-
         await Promise.all(
-          emailPayloads.map(payload =>
-            fetch('/api/send-email', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                ticketNumber: assignRequest.ticket_number,
-                title: assignRequest.request_title,
-                status: assignRequest.status,
-                notes: payload.notes,
-                recipientEmail: payload.recipientEmail,
-                recipientName: payload.recipientName
-              }),
-            }).catch(e => console.error('Gagal kirim sub-email delegasi:', e))
-          )
+          emailPayloads.map(async (payload) => {
+            try {
+              const emailRes = await fetch('/api/send-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  ticketNumber: assignRequest.ticket_number,
+                  title: assignRequest.request_title,
+                  status: assignRequest.status,
+                  notes: payload.notes,
+                  recipientEmail: payload.recipientEmail,
+                  recipientName: payload.recipientName
+                }),
+              });
+              
+              if (!emailRes.ok) {
+                 const err = await emailRes.json();
+                 console.error('Email notifikasi delegasi gagal dikirim karena ditolak oleh API:', err);
+              }
+            } catch (e) {
+              console.error('Gagal mengirim sub-email notifikasidelegasi (jaringan terputus):', e);
+            }
+          })
         );
 
         setRequests(prev => prev.map(r => r.id === assignRequest.id ? {
@@ -291,7 +294,7 @@
 
         if (targetRequest) {
           try {
-            await fetch('/api/send-email', {
+            const emailRes = await fetch('/api/send-email', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -299,12 +302,22 @@
                 title: targetRequest.request_title,
                 status: logStatusName,
                 notes: notes,
-                recipientEmail: 'mhasticmusic@gmail.com',
-                recipientName: `Stakeholder ${process.env.NEXT_PUBLIC_APP_NAME}`
+                recipientEmail: targetRequest.profiles?.email,
+                recipientName: targetRequest.profiles?.full_name
               }),
             });
+
+            if (!emailRes.ok) {
+              const errData = await emailRes.json();
+              console.error('API Resend menolak pengiriman email:', errData);
+              notifications.show({
+                title: 'Email Peringatan Gagal Terkirim',
+                message: errData.error || 'Terjadi kesalahan pada sistem notifikasi email.',
+                color: 'yellow',
+              });
+            }
           } catch (emailErr) {
-            console.error('Gagal mengirim email mutasi:', emailErr);
+            console.error('Jaringan terputus saat mengirim email mutasi:', emailErr);
           }
         }
 
@@ -478,25 +491,31 @@
           if (logError) throw logError;
 
           try {
-            await fetch('/api/send-email', {
+            const emailRes = await fetch('/api/send-email', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 ticketNumber: req.ticket_number,
                 title: req.request_title,
                 status: nextStatus,
-                notes: 'Pengajuan ditangguhkan sementara karena diperlukan peninjauan lebih lanjut.',
-                recipientEmail: 'mhasticmusic@gmail.com',
-                recipientName: `Stakeholder ${process.env.NEXT_PUBLIC_APP_NAME}`
+                notes: 'Pengajuan dilanjutkan ke tahap berikutnya.',
+                recipientEmail: req.profiles?.email,
+                recipientName: req.profiles?.full_name
               }),
             });
-          } catch (e) { console.error(e); }
+
+            if (!emailRes.ok) {
+               console.error('API Resend menolak pengiriman email saat melepas penangguhan.');
+            }
+          } catch (e) { 
+            console.error('Jaringan terputus saat email pelepasan penanggguhan:', e); 
+          }
 
           setRequests((prev) => prev.map((r) => (r.id === req.id ? { ...r, status: nextStatus, updated_at: nowStr } : r)));
 
           notifications.show({
-            title: 'SLA Berhasil Ditangguhkan',
-            message: `Tiket ${req.ticket_number} kini berstatus Hold aktif.`,
+            title: 'Pengajuan Berhasil Ditangguhkan',
+            message: `Tiket nomor ${req.ticket_number} kini berstatus Ditangguhkan.`,
             color: 'orange',
           });
 

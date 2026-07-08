@@ -207,21 +207,20 @@ export default function UserDashboard() {
     if (!userProfile || !categoryId) return;
 
     if (categoryId === '4' && !subCategory) {
-      notifications.show({
-        title: 'Data Belum Lengkap',
-        message: 'Harap pilih sub-kategori tiket Anda sebelum mengirim.',
-        color: 'orange'
-      });
+      notifications.show({ title: 'Data Belum Lengkap', 
+        message: 'Harap pilih sub-kategori tiket Anda sebelum mengirim.', color: 'orange' });
+      return;
+    }
+
+    if (!urgency) {
+      notifications.show({ title: 'Data Belum Lengkap', 
+        message: 'Harap tentukan Tingkat Urgensi pengajuan.', color: 'orange' });
       return;
     }
 
     if (!isTiketCategory && files.length === 0) {
-      notifications.show({
-        title: 'Dokumen Wajib Dilampirkan',
-        message: 'Silakan unggah dokumen pengajuan dalam format PDF terlebih dahulu.',
-        color: 'red',
-        autoClose: 4000,
-      });
+      notifications.show({ title: 'Dokumen Wajib Dilampirkan', 
+        message: 'Silakan unggah dokumen pengajuan dalam format PDF.', color: 'red' });
       return;
     }
 
@@ -295,20 +294,24 @@ export default function UserDashboard() {
       ]);
 
       try {
-        await fetch('/api/send-email', {
+        const emailRes = await fetch('/api/send-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             ticketNumber: ticketNumber,
             title: requestTitle,
-            status: 'Dikirim',
-            notes: 'Dokumen Anda berhasil masuk ke sistem antrean pusat dan menunggu verifikasi oleh pihak PIC.',
-            recipientEmail: 'mhasticmusic@gmail.com',
-            recipientName: `Stakeholder ${process.env.NEXT_PUBLIC_APP_NAME}`
+            status: 'Dikirim (Menunggu Antrean)',
+            notes: 'Dokumen Anda berhasil dikirim ke sistem dan menunggu verifikasi oleh pihak PIC.',
+            recipientEmail: userProfile?.email,
+            recipientName: userProfile?.fullName
           }),
         });
+
+        if (!emailRes.ok) {
+           console.warn('API Email menolak pengiriman:', await emailRes.json());
+        }
       } catch (emailErr) {
-        console.error('Gagal mengirim email konfirmasi tiket baru:', emailErr);
+        console.error('Jaringan terputus saat kirim notif email tiket baru:', emailErr);
       }
 
       try {
@@ -320,8 +323,8 @@ export default function UserDashboard() {
             title: requestTitle,
             status: 'Dikirim (Menunggu Antrean)',
             notes: 'Dokumen berhasil masuk ke sistem antrean pusat dan menunggu penanganan oleh PIC.',
-            recipientEmail: userProfile?.email || 'mhasticmusic@gmail.com',
-            recipientName: userProfile?.fullName || `Pengaju ${process.env.NEXT_PUBLIC_APP_NAME}`
+            recipientEmail: userProfile?.email,
+            recipientName: userProfile?.fullName
           }),
         });
       } catch (emailErr) {
@@ -330,7 +333,7 @@ export default function UserDashboard() {
 
       notifications.show({
         title: 'Pengajuan Berhasil Dikirim',
-        message: `Nomor tiket ${ticketNumber} telah sukses masuk ke sistem antrean PIC.`,
+        message: `Tiket nomor ${ticketNumber} telah sukses dikirim ke sistem.`,
         color: 'green',
         autoClose: 5000,
       });
@@ -339,6 +342,7 @@ export default function UserDashboard() {
       setDescription('');
       setCategoryId('');
       setFiles([]);
+      setUrgency(null);``
 
       fetchUserRequests(userProfile.id);
       setActiveMenu(1);

@@ -15,6 +15,7 @@ export default function RegisterPage() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
 
   const [workUnitOptions, setWorkUnitOptions] = useState<{ value: string; label: string }[]>([]);
@@ -68,6 +69,17 @@ export default function RegisterPage() {
     e.preventDefault();
     setLoading(true);
 
+    if (password !== confirmPassword) {
+      notifications.show({
+        title: 'Kata Sandi Tidak Cocok',
+        message: 'Pastikan konfirmasi kata sandi sesuai dengan kata sandi yang Anda masukkan.',
+        color: 'orange',
+        icon: <IconAlertCircle size={16} />
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
       if (!workUnit || (workUnit === 'Head Office' && !division)) {
         notifications.show({
@@ -82,6 +94,11 @@ export default function RegisterPage() {
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: fullName,
+          }
+        }
       });
 
       if (authError) throw authError;
@@ -103,11 +120,18 @@ export default function RegisterPage() {
         }
 
         notifications.show({
-          title: 'Registrasi Sukses',
-          message: 'Akun Anda berhasil terdaftar. Mengalihkan ke halaman login...',
+          title: 'Registrasi Hampir Selesai! ✉️',
+          message: 'Tautan verifikasi telah dikirim ke email Anda. Harap cek kotak masuk atau folder spam Anda sebelum mencoba masuk.',
           color: 'green',
-          autoClose: 3000,
+          autoClose: 8000,
         });
+
+        setEmail('');
+        setPassword('');
+        setConfirmPassword('');
+        setFullName('');
+        setWorkUnit('');
+        setDivision('');
 
         setTimeout(() => {
           router.push('/login');
@@ -230,19 +254,35 @@ export default function RegisterPage() {
                 }}
               />
 
-              <PasswordInput
-                label="Kata Sandi"
-                placeholder="Minimal 6 karakter"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                leftSection={<IconLock size={16} stroke={1.5} color="#94a3b8" />}
-                radius="md"
-                styles={{
-                  label: { fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '4px' },
-                  input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }
-                }}
-              />
+              <Group grow align="flex-start" gap="sm">
+                <PasswordInput
+                  label="Kata Sandi"
+                  placeholder="Minimal 6 karakter"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  leftSection={<IconLock size={16} stroke={1.5} color="#94a3b8" />}
+                  radius="md"
+                  styles={{
+                    label: { fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '4px' },
+                    input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }
+                  }}
+                />
+
+                <PasswordInput
+                  label="Konfirmasi Kata Sandi"
+                  placeholder="Ulangi kata sandi"
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  leftSection={<IconLock size={16} stroke={1.5} color="#94a3b8" />}
+                  radius="md"
+                  styles={{
+                    label: { fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '4px' },
+                    input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }
+                  }}
+                />
+              </Group>
 
               <Button
                 type="submit"

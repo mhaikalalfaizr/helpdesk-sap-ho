@@ -7,8 +7,11 @@ export async function POST(request: Request) {
   try {
     const { ticketNumber, title, status, notes, recipientEmail, recipientName } = await request.json();
 
-    if (!recipientEmail) {
-      return NextResponse.json({ error: 'Email penerima wajib diisi' }, { status: 400 });
+    if (!recipientEmail || !ticketNumber || !title || !status || !recipientName) {
+      return NextResponse.json(
+        { error: 'Data tidak lengkap. Pastikan email, nama, nomor tiket, judul, dan status terisi.' }, 
+        { status: 400 }
+      );
     }
 
     const emailHtml = `
@@ -37,21 +40,25 @@ export async function POST(request: Request) {
           </tr>` : ''}
         </table>
 
-        <p style="font-size: 13px; color: #64748b;">Silakan akses DocuTrack untuk meninjau riwayat dokumen Anda lebih lanjut.</p>
+        <p style="font-size: 13px; color: #64748b;">Silakan akses halaman Helpdesk untuk meninjau riwayat dokumen Anda lebih lanjut.</p>
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin-top: 30px;" />
         <p style="font-size: 11px; color: #94a3b8; text-align: center;">Pesan otomatis dari Sistem Helpdesk SAP HO. Harap tidak membalas email ini.</p>
       </div>
     `;
 
-    const data = await resend.emails.send({
-      from: 'Helpdesk SAP HO <onboarding@resend.dev>',
+    const { data, error } = await resend.emails.send({
+      from: 'Helpdesk SAP HO <no-reply@sap-ho.my.id>',
       to: recipientEmail,
       subject: `[SAP HO] Update Status Tiket ${ticketNumber} - ${status}`,
       html: emailHtml,
     });
 
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Terjadi kesalahan sistem, harap hubungi administrator.' }, { status: 500 });
   }
 }
