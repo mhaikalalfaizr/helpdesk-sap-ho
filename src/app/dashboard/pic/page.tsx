@@ -24,7 +24,8 @@
     created_at: string;
     updated_at?: string | null;
     profiles: { full_name: string; unit_kerja: string; division: string; email?: string } | null;
-    categories: { name: string; sla_days: number } | null;
+    categories: { id: number; name: string; sla_days: number } | null;
+    sub_categories?: { name: string; sla_days: number } | null;
     file_url?: string | null;
     current_pic_id?: string | null;
     pic?: { full_name: string } | null;
@@ -132,7 +133,8 @@
         .select(`
           id, ticket_number, request_title, description, status, total_hold_days, created_at, updated_at, file_url, current_pic_id, urgency,
           profiles:user_id (full_name, unit_kerja, division, email),
-          categories:category_id (name, sla_days),
+          categories:category_id (id, name, sla_days),
+          sub_categories:sub_category_id (name, sla_days),
           pic:current_pic_id (full_name),
           attachments (id, file_name, file_url, type)
         `)
@@ -298,7 +300,7 @@
                 status: logStatusName,
                 notes: notes,
                 recipientEmail: 'mhasticmusic@gmail.com',
-                recipientName: 'Stakeholder DocuTrack'
+                recipientName: `Stakeholder ${process.env.NEXT_PUBLIC_APP_NAME}`
               }),
             });
           } catch (emailErr) {
@@ -353,21 +355,48 @@
       }
     };
 
+    const checkIfOverdue = (createdAt: string, slaDays: number, status: string) => {
+      if (status === 'Selesai' || status === 'Selesai (Rilis PRD)' || status === 'Disetujui' || status === 'Ditolak') return false;
+      if (!slaDays) return false;
+
+      const createdDate = new Date(createdAt).getTime();
+      const currentDate = new Date().getTime();
+
+      const diffInDays = (currentDate - createdDate) / (1000 * 60 * 60 * 24);
+
+      return diffInDays > slaDays;
+    };
+
     const handleNextStep = async (req: RequestItem) => {
-      if (req.status === 'Dalam Proses oleh Konsultan') {
-          setFinalUploadRequest(req);
+      let nextStatus = '';
+
+      if (req.categories?.name === 'Tiket Lainnya') {
+        switch (req.status) {
+          case 'Dikirim': nextStatus = 'Dalam Proses oleh PIC'; break;
+          case 'Dalam Proses oleh PIC': nextStatus = 'Dalam Tahap Elisitasi Kebutuhan Pengguna'; break;
+          case 'Dalam Tahap Elisitasi Kebutuhan Pengguna': nextStatus = 'Dalam Tahap Pelaporan ke Konsultan'; break;
+          case 'Dalam Tahap Pelaporan ke Konsultan': nextStatus = 'Dalam Tahap Pengembangan'; break;
+          case 'Dalam Tahap Pengembangan': nextStatus = 'Dalam Tahap Pengujian Penerimaan Pengguna (UAT)'; break;
+          case 'Dalam Tahap Pengujian Penerimaan Pengguna (UAT)': nextStatus = 'Selesai (Rilis PRD)'; break;
+          default: return;
+        }
+
+        if (req.status === 'Dalam Tahap Pengujian Penerimaan Pengguna (UAT)') {
+          await updateDatabaseStatus(req.id, { status: nextStatus }, nextStatus, 'Tiket selesai, PRD dirilis.');
           return;
+        }
       }
 
-      let nextStatus = '';
-      switch (req.status) {
-        case 'Dikirim': nextStatus = 'Dalam Proses oleh PIC'; break;
-        case 'Dalam Proses oleh PIC': nextStatus = 'Dalam Proses oleh Head Office'; break;
-        case 'Dalam Proses oleh Head Office': nextStatus = 'Dalam Proses oleh Holding'; break;
-        case 'Dalam Proses oleh Holding': nextStatus = 'Dalam Proses oleh Konsultan'; break;
-        default:
-          alert(`Gagal Maju: Status "${req.status}" tidak dikenali.`);
-          return;
+      else {
+        switch (req.status) {
+          case 'Dikirim': nextStatus = 'Dalam Proses oleh PIC'; break;
+          case 'Dalam Proses oleh PIC': nextStatus = 'Dalam Tahap Elisitasi Kebutuhan Pengguna'; break;
+          case 'Dalam Tahap Elisitasi Kebutuhan Pengguna': nextStatus = 'Dalam Tahap Pelaporan ke Konsultan'; break;
+          case 'Dalam Tahap Pelaporan ke Konsultan': nextStatus = 'Dalam Tahap Pengembangan'; break;
+          case 'Dalam Tahap Pengembangan': nextStatus = 'Dalam Tahap Pengujian Penerimaan Pengguna (UAT)'; break;
+          case 'Dalam Tahap Pengujian Penerimaan Pengguna (UAT)': nextStatus = 'Selesai (Rilis PRD)'; break;
+          default: return;
+        }
       }
 
       await updateDatabaseStatus(req.id, { status: nextStatus }, nextStatus, 'Maju ke tahap selanjutnya.');
@@ -394,16 +423,16 @@
               file_name: finalFile.name,
               file_url: publicUrl,
               uploaded_by: currentPicId,
-              type: 'Form_Final'
+              type: 'Dokumen_Final'
           }
           ]);
           if (attachError) throw attachError;
 
-          await updateDatabaseStatus(finalUploadRequest.id, { status: 'Disetujui' }, 'Disetujui', 'Berkas disetujui. Berkas form final dilampirkan.');
+          await updateDatabaseStatus(finalUploadRequest.id, { status: 'Disetujui' }, 'Disetujui', 'Pengajuan disetujui. Dokumen akhir dilampirkan.');
 
           notifications.show({
-            title: 'Dokumen Akhir Disahkan',
-            message: `Berkas final untuk ${finalUploadRequest.ticket_number} sukses diunggah ke cloud storage.`,
+            title: 'Pengajuan Disetujui',
+            message: `Dokumen akhir untuk tiket nomor ${finalUploadRequest.ticket_number} sukses diunggah.`,
             color: 'green',
           });
 
@@ -411,7 +440,7 @@
           setFinalFile(null);
       } catch (err: any) {
           notifications.show({
-            title: 'Gagal Mengesahkan Dokumen',
+            title: 'Gagal Menyelesaikan Pengajuan',
             message: err.message,
             color: 'red',
           });
@@ -428,7 +457,6 @@
         if (req.status.includes('PIC')) nextStatus = 'Sedang Ditangguhkan di PIC';
         else if (req.status.includes('Head Office')) nextStatus = 'Sedang Ditangguhkan di Head Office';
         else if (req.status.includes('Holding')) nextStatus = 'Sedang Ditangguhkan di Holding';
-        else if (req.status.includes('Konsultan')) nextStatus = 'Sedang Ditangguhkan di Konsultan';
 
         if (!nextStatus) {
           notifications.show({ title: 'Gagal Memproses', message: `Sub-status tidak dikenali dari "${req.status}"`, color: 'red' });
@@ -437,7 +465,7 @@
 
         try {
           const { error: holdError } = await supabase.from('request_holds').insert([
-            { request_id: req.id, hold_reason: `Penangguhan berkas pada fase ${req.status}`, hold_start: nowStr }
+            { request_id: req.id, hold_reason: `Penangguhan pengajuan pada fase ${req.status}`, hold_start: nowStr }
           ]);
           if (holdError) throw holdError;
 
@@ -459,7 +487,7 @@
                 status: nextStatus,
                 notes: 'Pengajuan ditangguhkan sementara karena diperlukan peninjauan lebih lanjut.',
                 recipientEmail: 'mhasticmusic@gmail.com',
-                recipientName: 'Stakeholder DocuTrack'
+                recipientName: `Stakeholder ${process.env.NEXT_PUBLIC_APP_NAME}`
               }),
             });
           } catch (e) { console.error(e); }
@@ -480,7 +508,6 @@
         if (req.status.includes('PIC')) nextStatus = 'Dalam Proses oleh PIC';
         else if (req.status.includes('Head Office')) nextStatus = 'Dalam Proses oleh Head Office';
         else if (req.status.includes('Holding')) nextStatus = 'Dalam Proses oleh Holding';
-        else if (req.status.includes('Konsultan')) nextStatus = 'Dalam Proses oleh Konsultan';
 
         if (!nextStatus) {
           notifications.show({ title: 'Gagal Memproses', message: `Sub-status tidak dikenali dari "${req.status}"`, color: 'red' });
@@ -545,7 +572,7 @@
                 status: nextStatus,
                 notes: 'Pengajuan dilanjutkan ke tahap berikutnya.',
                 recipientEmail: 'mhasticmusic@gmail.com',
-                recipientName: 'Stakeholder DocuTrack'
+                recipientName: `Stakeholder ${process.env.NEXT_PUBLIC_APP_NAME}`
               }),
             });
           } catch (e) { console.error(e); }
@@ -588,7 +615,7 @@
 
     const calculateTotalSlaDays = (createdAtString: string, status: string, newTotalHoldDays: number, updatedAtString?: string | null) => {
       const created = new Date(createdAtString).getTime();
-      const isFinal = status === 'Disetujui' || status === 'Ditolak';
+      const isFinal = status === 'Disetujui' || status === 'Ditolak' || status === 'Selesai (Rilis PRD)';
       const isCurrentlyHold = status.startsWith('Sedang Ditangguhkan di');
 
       const endTime = (isFinal && updatedAtString)
@@ -676,7 +703,7 @@
               </Avatar>
                 <Box>
                   <Text size="sm" fw={600} c="slateClean.9">Halo, {currentUserName}</Text>
-                  <Text size="xs" c="dimmed">Selamat datang di DocuTrack</Text>
+                  <Text size="xs" c="dimmed">Selamat datang di {process.env.NEXT_PUBLIC_APP_NAME}</Text>
                 </Box>
             </Group>
 
@@ -698,7 +725,7 @@
                 <Box bg="ptpn4Green.0" p="xs" style={{ borderRadius: '12px', display: 'flex', alignItems: 'center' }}>
                   <IconChecklist size={24} color="#0e422a" />
                 </Box>
-                <Text fw={800} size="xl" lts="tight" c="ptpn4Green.9">DocuTrack.</Text>
+                <Text fw={800} size="xl" lts="tight" c="ptpn4Green.9">{process.env.NEXT_PUBLIC_APP_NAME}</Text>
               </Group>
 
               <Stack gap={4}>
@@ -732,7 +759,7 @@
             <Paper bg="ptpn4Green.9" p="xl" style={{ position: 'relative', color: '#fff' }}>
               <Text size="xs" fw={700} c="ptpn4Green.2" lts="0.5px">TOTAL TIKET MASUK</Text>
               <Text size="36px" fw={800} my="xs">{loading ? '...' : totalCount}</Text>
-              <Text size="xs" c="ptpn4Green.1" fw={500}>Seluruh riwayat berkas</Text>
+              <Text size="xs" c="ptpn4Green.1" fw={500}>Seluruh riwayat pengajuan</Text>
             </Paper>
 
             <Paper p="xl">
@@ -780,9 +807,10 @@
                   styles={{ input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' } }}
                 />
 
-              <Table verticalSpacing="md" horizontalSpacing="md" highlightOnHover variant="simple" striped>
+              <Table verticalSpacing="md" horizontalSpacing="md" highlightOnHover variant="simple" striped >
                 <Table.Thead bg="slateClean.0">
                   <Table.Tr>
+
                     <Table.Th style={{ borderBottom: '1px solid #e2e8f0', cursor: 'pointer' }} onClick={() => handleSortRequest('ticket')} w={230}>
                       <Text size="xs" fw={700} c="slateClean.5">NO. TIKET{renderSortArrow('ticket')}</Text>
                     </Table.Th>
@@ -822,10 +850,17 @@
                   ) : (
 
                   getFilteredAndSortedRequests().map((req) => {
-                    const isFinal = req.status === 'Disetujui' || req.status === 'Ditolak';
+                    const isFinal = req.status === 'Disetujui' || req.status === 'Ditolak' || req.status === 'Selesai (Rilis PRD)';
                     const isHoldState = req.status.startsWith('Sedang Ditangguhkan di');
-                    const canHold = req.status.includes('PIC') || req.status.includes('Head Office') || req.status.includes('Holding') || req.status.includes('Konsultan') || req.status.startsWith('Dalam Proses oleh');
+                    const canHold = req.status.includes('PIC') || req.status.includes('Head Office') || req.status.includes('Holding') || req.status.startsWith('Dalam Proses oleh');
                     const isLockedByOtherPic = req.current_pic_id && req.current_pic_id !== currentPicId;
+
+                    const effectiveSlaDays = (req.categories?.id === 3 || req.categories?.name === 'Tiket Lainnya')
+                      ? req.sub_categories?.sla_days
+                      : req.categories?.sla_days;
+
+                    const isOverdue = checkIfOverdue(req.created_at, effectiveSlaDays ?? 0, req.status);
+
                     const getUrgencyColor = (urgency: string) => {
                       if (urgency === 'Tinggi') return 'red';
                       if (urgency === 'Sedang') return 'orange';
@@ -833,7 +868,8 @@
                     };
 
                     return (
-                      <Table.Tr key={req.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <Table.Tr key={req.id} style={{ borderBottom: '1px solid #f1f5f9', 
+                        backgroundColor: isOverdue ? '#fff5f5' : 'undefined', transition: 'background-color 0.2s ease', }}>
                         <Table.Td>
                           <Stack gap={2} align="flex-start">
                           <Tooltip label="Klik untuk melihat riwayat pengajuan" position="top" withArrow>
@@ -847,7 +883,7 @@
                               {req.ticket_number} 📋
                             </Text>
                           </Tooltip>
-                      
+
                         <Badge
                             color={getUrgencyColor(req.urgency || 'Sedang')}
                             variant="filled"
@@ -889,7 +925,7 @@
                             color={
                               isHoldState
                               ? 'orange'
-                              : req.status === 'Disetujui'
+                              : (req.status === 'Disetujui' || req.status === 'Selesai (Rilis PRD)')
                               ? 'green'
                               : req.status === 'Ditolak'
                               ? 'red'
@@ -917,21 +953,21 @@
                               </Badge>
                             ) : (
                               <>
-                                <Tooltip label={req.status === 'Dalam Proses oleh Konsultan' ? 'Upload Form_Final & Setujui Berkas' : 'Lanjutkan proses ke tahap berikutnya'} position="top" withArrow>
+                                <Tooltip label={req.status === 'Dalam Proses oleh Holding' ? 'Upload Dokumen Akhir & Setujui Pengajuan' : 'Lanjutkan proses ke tahap berikutnya'} position="top" withArrow>
                                   <ActionIcon
                                     size="md"
                                     variant="light"
                                     color="green"
                                     disabled={isHoldState}
                                     onClick={() => {
-                                      if (req.status === 'Dalam Proses oleh Konsultan') {
+                                      if (req.status === 'Dalam Proses oleh Holding') {
                                         handleNextStep(req);
                                       } else {
                                         setConfirmNextRequest(req);
                                       }
                                     }}
                                   >
-                                    {req.status === 'Dalam Proses oleh Konsultan' ? <IconFileCheck size={18} /> : <IconArrowRight size={18} />}
+                                    {req.status === 'Dalam Proses oleh Holding' ? <IconFileCheck size={18} /> : <IconArrowRight size={18} />}
                                   </ActionIcon>
                                 </Tooltip>
 
@@ -990,13 +1026,13 @@
           <Modal
             opened={finalUploadRequest !== null}
             onClose={() => setFinalUploadRequest(null)}
-            title="Unggah Berkas Final"
+            title="Unggah Dokumen Final"
             centered
             radius="lg"
           >
             <form onSubmit={handleSubmitFinalDocument}>
               <Stack gap="md">
-                <Text size="xs" c="dimmed">Untuk menyelesaikan tiket ini menjadi status Disetujui, Anda wajib melampirkan berkas PDF Form yang telah divalidasi.</Text>
+                <Text size="xs" c="dimmed">Untuk menyelesaikan tiket ini menjadi status Disetujui, Anda wajib melampirkan dokumen final yang telah divalidasi.</Text>
                 <FileInput
                   label="Dokumen Final (.PDF)"
                   placeholder="Pilih file PDF resmi"
@@ -1028,7 +1064,7 @@
 
                 <Textarea
                   label="Alasan/Keterangan Penolakan"
-                  placeholder="Berikan keterangan yang jelas (misal: Format berkas awal tidak valid...)"
+                  placeholder="Berikan keterangan yang jelas (misal: Format dokumen awal tidak valid...)"
                   required
                   rows={4}
                   value={rejectReason}
@@ -1203,7 +1239,7 @@
               <Badge color="ptpn4Green.9" variant="filled" radius="sm">
                 {selectedDetail?.ticket_number}
               </Badge>
-              <Text fw={800} size="md" c="slateClean.9">Detail Berkas Pengajuan</Text>
+              <Text fw={800} size="md" c="slateClean.9">Detail Dokumen Pengajuan</Text>
             </Group>
           }
           position="right"
@@ -1245,14 +1281,14 @@
               </Box>
 
               {}
-              {selectedDetail.attachments && selectedDetail.attachments.filter((a: any) => a.type === 'Form_Awal').length > 0 ? (
+              {selectedDetail.attachments && selectedDetail.attachments.filter((a: any) => a.type === 'Dokumen_Awal').length > 0 ? (
                 <Box>
                   <Text size="xs" c="dimmed" fw={600} mb={4}>
-                    BERKAS LAMPIRAN AWAL ({selectedDetail.attachments.filter((a: any) => a.type === 'Form_Awal').length} Berkas)
+                    DOKUMEN LAMPIRAN AWAL ({selectedDetail.attachments.filter((a: any) => a.type === 'Dokumen_Awal').length} Dokumen)
                   </Text>
                   <Stack gap="xs">
                     {selectedDetail.attachments
-                      .filter((att: any) => att.type === 'Form_Awal')
+                      .filter((att: any) => att.type === 'Dokumen_Awal')
                       .map((file: any, idx: number) => (
                         <Button
                           key={file.id || idx}
@@ -1267,7 +1303,7 @@
                           styles={{ inner: { justifyContent: 'flex-start' } }}
                         >
                           <Text size="xs" truncate style={{ maxWidth: '90%' }}>
-                            {file.file_name || `Unduh Berkas Lampiran ${idx + 1}`}
+                            {file.file_name || `Unduh Dokumen Lampiran ${idx + 1}`}
                           </Text>
                         </Button>
                       ))}

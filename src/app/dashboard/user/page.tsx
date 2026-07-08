@@ -29,7 +29,8 @@ interface MyRequestItem {
   created_at: string;
   profiles: { full_name: string; division: string; email?: string } | null;
   updated_at?: string | null;
-  categories: { name: string; sla_days: number } | null;
+  categories: { id: number; name: string; sla_days: number } | null;
+  sub_categories?: { name: string; sla_days: number } | null;
   pic?: { full_name: string } | null;
   file_url?: string | null;
   current_pic_id?: string | null;
@@ -50,6 +51,8 @@ export default function UserDashboard() {
 
   const [userProfile, setUserProfile] = useState<{ id: string; fullName: string; division: string; email: string } | null>(null);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [subCategoryOptions, setSubCategoryOptions] = useState<{ value: string; label: string }[]>([]);
+  const [subCategory, setSubCategory] = useState<string | null>(null);
   const [myRequests, setMyRequests] = useState<MyRequestItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUserName, setCurrentUserName] = useState<string>('');
@@ -72,6 +75,7 @@ export default function UserDashboard() {
   const [urgency, setUrgency] = useState<string | null>(null);
 
   useEffect(() => {
+
     initDashboard();
 
     const channel = supabase
@@ -93,6 +97,30 @@ export default function UserDashboard() {
       supabase.removeChannel(channel);
     };
   }, [router]);
+
+  useEffect(() => {
+    const fetchSubCategories = async () => {
+      if (categoryId !== '4') {
+        setSubCategoryOptions([]);
+        setSubCategory(null);
+        return;
+      }
+
+      const { data } = await supabase
+        .from('sub_categories')
+        .select('id, name')
+        .eq('category_id', 4);
+
+      if (data) {
+        setSubCategoryOptions(data.map(sub => ({
+          value: String(sub.id),
+          label: sub.name
+        })));
+      }
+    };
+
+    fetchSubCategories();
+  }, [categoryId]);
 
   const initDashboard = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -140,7 +168,8 @@ export default function UserDashboard() {
       .select(`
         id, ticket_number, request_title, description, status, total_hold_days, created_at, updated_at, file_url, urgency,
         user_profile:user_id (full_name, division, email),
-        categories:category_id (name, sla_days),
+        categories:category_id (id, name, sla_days),
+        sub_categories:sub_category_id (name, sla_days),
         pic:current_pic_id (full_name),
         attachments (id, file_url, type)
       `)
@@ -177,10 +206,19 @@ export default function UserDashboard() {
     e.preventDefault();
     if (!userProfile || !categoryId) return;
 
-    if (files.length === 0) {
+    if (categoryId === '4' && !subCategory) {
       notifications.show({
-        title: 'Berkas Wajib Dilampirkan',
-        message: 'Silakan unggah berkas formulir dalam format PDF terlebih dahulu.',
+        title: 'Data Belum Lengkap',
+        message: 'Harap pilih sub-kategori tiket Anda sebelum mengirim.',
+        color: 'orange'
+      });
+      return;
+    }
+
+    if (!isTiketCategory && files.length === 0) {
+      notifications.show({
+        title: 'Dokumen Wajib Dilampirkan',
+        message: 'Silakan unggah dokumen pengajuan dalam format PDF terlebih dahulu.',
         color: 'red',
         autoClose: 4000,
       });
@@ -188,6 +226,7 @@ export default function UserDashboard() {
     }
 
     setFormLoading(true);
+    let insertedRequestId: string | null = null;
 
     try {
       const ticketNumber = generateTicketNumber();
@@ -205,15 +244,15 @@ export default function UserDashboard() {
         if (uploadError) throw uploadError;
 
         const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(filePath);
-        
+
         uploadedAttachments.push({
           file_name: currentFile.name,
           file_url: publicUrl,
-          type: 'Form_Awal' 
+          type: 'Dokumen_Awal'
         });
       }
 
-      const primaryFileUrl = uploadedAttachments[0]?.file_url || '';
+      const primaryFileUrl = uploadedAttachments[0]?.file_url || null;
 
       const { data: newRequest, error: insertError } = await supabase
         .from('requests')
@@ -222,6 +261,7 @@ export default function UserDashboard() {
             ticket_number: ticketNumber,
             user_id: userProfile.id,
             category_id: parseInt(categoryId),
+            sub_category_id: categoryId === '4' ? (subCategory ? parseInt(subCategory) : null) : null,
             request_title: requestTitle,
             description: description,
             status: 'Dikirim',
@@ -234,6 +274,8 @@ export default function UserDashboard() {
         .single();
 
       if (insertError) throw insertError;
+
+      insertedRequestId = newRequest.id;
 
       if (uploadedAttachments.length > 0) {
         const attachmentsPayload = uploadedAttachments.map((att) => ({
@@ -262,7 +304,7 @@ export default function UserDashboard() {
             status: 'Dikirim',
             notes: 'Dokumen Anda berhasil masuk ke sistem antrean pusat dan menunggu verifikasi oleh pihak PIC.',
             recipientEmail: 'mhasticmusic@gmail.com',
-            recipientName: 'Stakeholder DocuTrack'
+            recipientName: `Stakeholder ${process.env.NEXT_PUBLIC_APP_NAME}`
           }),
         });
       } catch (emailErr) {
@@ -278,8 +320,8 @@ export default function UserDashboard() {
             title: requestTitle,
             status: 'Dikirim (Menunggu Antrean)',
             notes: 'Dokumen berhasil masuk ke sistem antrean pusat dan menunggu penanganan oleh PIC.',
-            recipientEmail: userProfile?.email || 'haikalritonga.kerja@gmail.com',
-            recipientName: userProfile?.fullName || 'Pengaju DocuTrack'
+            recipientEmail: userProfile?.email || 'mhasticmusic@gmail.com',
+            recipientName: userProfile?.fullName || `Pengaju ${process.env.NEXT_PUBLIC_APP_NAME}`
           }),
         });
       } catch (emailErr) {
@@ -302,11 +344,11 @@ export default function UserDashboard() {
       setActiveMenu(1);
 
     } catch (error: any) {
-      notifications.show({
-        title: 'Gagal Membuat Pengajuan',
-        message: error.message,
-        color: 'red',
-      });
+      if (insertedRequestId) {
+        await supabase.from('requests').delete().eq('id', insertedRequestId);
+      }
+
+      notifications.show({ title: 'Gagal Membuat Pengajuan', message: error.message, color: 'red' });
     } finally {
       setFormLoading(false);
     }
@@ -319,7 +361,7 @@ export default function UserDashboard() {
 
   const getStatusColor = (status: string) => {
     if (status.startsWith('Sedang Ditangguhkan') || status.startsWith('Sedang Ditahan')) return 'orange';
-    if (status === 'Disetujui' || status === 'Disetujui Seluruh Pihak') return 'green';
+    if (status === 'Disetujui' || status === 'Disetujui Seluruh Pihak' || status === 'Selesai (Rilis PRD)') return 'green';
     if (status === 'Ditolak') return 'red'
     if (status === 'Dikirim') return 'cyan';
     return 'blue';
@@ -371,7 +413,7 @@ export default function UserDashboard() {
 
   const calculateTotalSlaDays = (createdAtString: string, status: string, newTotalHoldDays: number, updatedAtString?: string | null) => {
     const created = new Date(createdAtString).getTime();
-      const isFinal = status === 'Disetujui' || status === 'Ditolak';
+      const isFinal = status === 'Disetujui' || status === 'Ditolak' || status === 'Selesai (Rilis PRD)';
       const isCurrentlyHold = status.startsWith('Sedang Ditangguhkan di');
 
       const endTime = (isFinal && updatedAtString)
@@ -383,7 +425,7 @@ export default function UserDashboard() {
       let finalHoldDays = newTotalHoldDays || 0;
 
       if (isCurrentlyHold && updatedAtString) {
-        const holdStart = new Date(updatedAtString).getTime(); 
+        const holdStart = new Date(updatedAtString).getTime();
         const currentHoldDuration = Math.floor((new Date().getTime() - holdStart) / (1000 * 60 * 60 * 24));
         finalHoldDays += currentHoldDuration;
       }
@@ -397,6 +439,9 @@ export default function UserDashboard() {
   const processCount = myRequests.filter(r => r.status.startsWith('Dalam Proses') || r.status === 'Dikirim').length;
   const holdCount = myRequests.filter(r => r.status.startsWith('Sedang Ditangguhkan') || r.status.startsWith('Sedang Ditahan')).length;
   const archivedCount = myRequests.filter(r => r.status === 'Disetujui' || r.status === 'Ditolak').length;
+
+  const activeCategoryLabel = categories.find(c => c.value === categoryId)?.label || '';
+  const isTiketCategory = activeCategoryLabel.toLowerCase().includes('tiket');
 
   if (loading || !userProfile) return <Text ta="center" mt="xl" c="dimmed" fw={500}>Memuat dashboard...</Text>;
 
@@ -414,7 +459,7 @@ export default function UserDashboard() {
               </Avatar>
                 <Box>
                   <Text size="sm" fw={600} c="slateClean.9">Halo, {currentUserName}</Text>
-                  <Text size="xs" c="dimmed">Selamat datang di DocuTrack</Text>
+                  <Text size="xs" c="dimmed">Selamat datang di {process.env.NEXT_PUBLIC_APP_NAME}</Text>
                 </Box>
             </Group>
 
@@ -436,7 +481,7 @@ export default function UserDashboard() {
               <Box bg="ptpn4Green.0" p="xs" style={{ borderRadius: '12px', display: 'flex', alignItems: 'center' }}>
                 <IconChecklist size={24} color="#0e422a" />
               </Box>
-              <Text fw={800} size="xl" lts="tight" c="ptpn4Green.9">DocuTrack.</Text>
+              <Text fw={800} size="xl" lts="tight" c="ptpn4Green.9">{process.env.NEXT_PUBLIC_APP_NAME}</Text>
             </Group>
 
             <Stack gap={4}>
@@ -473,7 +518,7 @@ export default function UserDashboard() {
           <Box style={{ maxWidth: '1700px', margin: '0 auto' }}>
             <Box mb="xl">
               <Stack gap="xs">
-                <Text size="28px" fw={800} c="slateClean.9" style={{ letterSpacing: '-0.5px' }}>Formulir Pengajuan Berkas</Text>
+                <Text size="28px" fw={800} c="slateClean.9" style={{ letterSpacing: '-0.5px' }}>Formulir Pengajuan Dokumen</Text>
                 <Text size="sm" c="dimmed">Isi kelengkapan data pada formulir berikut untuk mengajukan permohonan.</Text>
              </Stack>
             </Box>
@@ -487,7 +532,7 @@ export default function UserDashboard() {
                 <Stack gap="md">
                   <Select
                     label="Kategori Pengajuan"
-                    placeholder="Pilih kategori berkas yang sesuai"
+                    placeholder="Pilih kategori yang sesuai"
                     data={categories}
                     searchable
                     required
@@ -495,6 +540,18 @@ export default function UserDashboard() {
                     onChange={(value) => setCategoryId(value || '')}
                     radius="md"
                   />
+                  {subCategoryOptions.length > 0 && (
+                    <Select
+                      label="Sub-Kategori Tiket"
+                      placeholder="Pilih tipe permasalahan yang sesuai"
+                      required
+                      searchable
+                      value={subCategory}
+                      onChange={setSubCategory}
+                      data={subCategoryOptions}
+                      radius="md"
+                    />
+                  )}
                   <TextInput
                     label="Judul Pengajuan"
                     placeholder="Contoh: Pengajuan Akses Akun SAP"
@@ -526,10 +583,10 @@ export default function UserDashboard() {
                     radius="md"
                   />
                   <FileInput
-                    label="Unggah Berkas Formulir (.PDF)"
-                    placeholder="Pilih berkas formulir"
-                    required
-                    withAsterisk
+                    label="Unggah Dokumen Pengajuan (.PDF)"
+                    placeholder={isTiketCategory ? "Opsional (dalam format .PDF)" : "Pilih dokumen dari perangkat Anda"}
+                    required={!isTiketCategory}
+                    withAsterisk={!isTiketCategory}
                     value={files}
                     onChange={setFiles}
                     accept="application/pdf"
@@ -549,8 +606,8 @@ export default function UserDashboard() {
           <Box>
             <Box mb="xl">
               <Stack gap="xs">
-                <Text size="28px" fw={800} c="slateClean.9" style={{ letterSpacing: '-0.5px' }}>Monitoring & Pelacakan Berkas</Text>
-                <Text size="sm" c="dimmed">Pantau berkas yang anda ajukan.</Text>
+                <Text size="28px" fw={800} c="slateClean.9" style={{ letterSpacing: '-0.5px' }}>Monitoring & Pelacakan Dokumen</Text>
+                <Text size="sm" c="dimmed">Pantau pengajuan anda.</Text>
               </Stack>
             </Box>
 
@@ -558,7 +615,7 @@ export default function UserDashboard() {
               <Paper bg="ptpn4Green.9" p="xl" style={{ position: 'relative', color: '#fff' }}>
                 <Text size="xs" fw={700} c="ptpn4Green.2" lts="0.5px">TOTAL PENGAJUAN SAYA</Text>
                 <Text size="36px" fw={800} my="xs">{totalCount}</Text>
-                <Text size="xs" c="ptpn4Green.1" fw={500}>Seluruh riwayat berkas</Text>
+                <Text size="xs" c="ptpn4Green.1" fw={500}>Seluruh riwayat pengajuan</Text>
               </Paper>
               <Paper p="xl">
                 <Text size="xs" fw={700} c="slateClean.4" lts="0.5px">TIKET DALAM PROSES</Text>
@@ -625,7 +682,11 @@ export default function UserDashboard() {
                     </Table.Tr>
                   ) : (
                     getFilteredAndSortedRequests().map((req) => {
-                      const finalAttachment = req.attachments?.find((att: any) => att.type === 'Form_Final');
+                      const finalAttachment = req.attachments?.find((att: any) => att.type === 'Dokumen_Final');
+
+                      const effectiveSlaDays = (req.categories?.id === 4 || req.categories?.name === 'Tiket')
+                        ? req.sub_categories?.sla_days
+                        : req.categories?.sla_days;
 
                       return (
                         <Table.Tr key={req.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
@@ -643,9 +704,9 @@ export default function UserDashboard() {
                               </Text>
                             </Tooltip>
 
-                            <Badge 
-                              color={req.urgency === 'Tinggi' ? 'red' : req.urgency === 'Sedang' ? 'orange' : 'gray'} 
-                              variant="filled" 
+                            <Badge
+                              color={req.urgency === 'Tinggi' ? 'red' : req.urgency === 'Sedang' ? 'orange' : 'gray'}
+                              variant="filled"
                               size="xs"
                               styles={{ root: { textTransform: 'none', height: '17px', padding: '0 4px' } }}
                             >
@@ -656,7 +717,12 @@ export default function UserDashboard() {
 
                           <Table.Td>
                             <Text size="sm" fw={500} c="slateClean.7">{req.request_title}</Text>
-                            <Text size="11px" c="dimmed">{req.categories?.name || 'Tidak Diketahui'} | Batas: {req.categories?.sla_days ?? 0} Hari</Text>
+                            <Text size="11px" c="dimmed">
+                              {req.categories?.name || 'Tidak Diketahui'}
+                                {(req.categories?.id === 4 || req.categories?.name === 'Tiket Lainnya')
+                                && req.sub_categories?.name ? ` (${req.sub_categories.name}) ` : ' '}
+                               | Batas: {effectiveSlaDays ?? 0} Hari
+                            </Text>
                           </Table.Td>
 
                           <Table.Td>
@@ -765,10 +831,10 @@ export default function UserDashboard() {
 
               {selectedRequest.attachments && selectedRequest.attachments.length > 0 && (
               <Box>
-                <Text size="xs" c="dimmed" fw={600} mb={4}>LAMPIRAN BERKAS AWAL ({selectedRequest.attachments.filter((a: any) => a.type === 'Form_Awal').length} File)</Text>
+                <Text size="xs" c="dimmed" fw={600} mb={4}>LAMPIRAN BERKAS AWAL ({selectedRequest.attachments.filter((a: any) => a.type === 'Dokumen_Awal').length} File)</Text>
                 <Stack gap="xs">
                   {selectedRequest.attachments
-                    .filter((att: any) => att.type === 'Form_Awal')
+                    .filter((att: any) => att.type === 'Dokumen_Awal')
                     .map((file: any, idx: number) => (
                       <Button
                         key={file.id || idx}
@@ -783,7 +849,7 @@ export default function UserDashboard() {
                         styles={{ inner: { justifyContent: 'flex-start' } }}
                       >
                         <Text size="xs" truncate style={{ maxWidth: '90%' }}>
-                          {file.file_name || `Unduh Berkas Lampiran ${idx + 1}`}
+                          {file.file_name || `Unduh Dokumen Lampiran ${idx + 1}`}
                         </Text>
                       </Button>
                     ))}
@@ -795,7 +861,7 @@ export default function UserDashboard() {
               <Divider my="sm" label={<Text size="10px" fw={700} c="slateClean.4" lts="0.5px">RIWAYAT ALUR DOKUMEN</Text>} labelPosition="center" />
 
               {loadingTimeline ? (
-                <Text size="xs" ta="center" c="dimmed" py="sm">Menjemput jejak log berkas...</Text>
+                <Text size="xs" ta="center" c="dimmed" py="sm">Mengambil riwayat status dokumen...</Text>
               ) : (
                 <Timeline active={historyLogs.length - 1} bulletSize={18} lineWidth={1.5} color="ptpn4Green.9">
                   {historyLogs.map((log, index) => {

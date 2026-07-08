@@ -13,7 +13,7 @@ export async function POST(request: Request) {
 
     const emailHtml = `
       <div style="font-family: sans-serif; padding: 20px; color: #334155; max-width: 600px; border: 1px solid #e2e8f0; border-radius: 8px;">
-        <h2 style="color: #0e422a;">DocuTrack PalmCo Notification</h2>
+        <h2 style="color: #0e422a;">Helpdesk SAP HO Notification</h2>
         <p>Halo <strong>${recipientName}</strong>,</p>
         <p>Terdapat pembaruan status penting terkait pelacakan dokumen di sistem antrean pusat:</p>
 
@@ -39,14 +39,14 @@ export async function POST(request: Request) {
 
         <p style="font-size: 13px; color: #64748b;">Silakan akses DocuTrack untuk meninjau riwayat dokumen Anda lebih lanjut.</p>
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin-top: 30px;" />
-        <p style="font-size: 11px; color: #94a3b8; text-align: center;">Pesan otomatis dari Sistem DocuTrack PalmCo. Harap tidak membalas email ini.</p>
+        <p style="font-size: 11px; color: #94a3b8; text-align: center;">Pesan otomatis dari Sistem Helpdesk SAP HO. Harap tidak membalas email ini.</p>
       </div>
     `;
 
     const data = await resend.emails.send({
-      from: 'DocuTrack PalmCo <onboarding@resend.dev>',
+      from: 'Helpdesk SAP HO <onboarding@resend.dev>',
       to: recipientEmail,
-      subject: `[DocuTrack] Update Status Tiket ${ticketNumber} - ${status}`,
+      subject: `[SAP HO] Update Status Tiket ${ticketNumber} - ${status}`,
       html: emailHtml,
     });
 

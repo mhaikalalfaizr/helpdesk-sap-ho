@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import { notifications } from '@mantine/notifications';
@@ -10,60 +10,66 @@ import {
 } from '@mantine/core';
 import { IconMail, IconLock, IconChecklist, IconAlertCircle, IconUser, IconBriefcase } from '@tabler/icons-react';
 
-const locationData = [
-  { value: 'Head Office', label: 'Head Office (Kantor Pusat)' },
-  { value: 'Regional 1', label: 'Regional 1' },
-  { value: 'Regional 2', label: 'Regional 2' },
-  { value: 'Regional 3', label: 'Regional 3' },
-  { value: 'Regional 4', label: 'Regional 4' },
-  { value: 'Regional 5', label: 'Regional 5' },
-  { value: 'Regional 6', label: 'Regional 6' },
-  { value: 'Regional 7', label: 'Regional 7' },
-];
-
-const hoDivisionData = [
-  { value: 'Divisi Sekretariat Perusahaan', label: 'DSPN - Divisi Sekretariat Perusahaan' },
-  { value: 'Divisi Satuan Pengawasan Intern', label: 'DSPI - Divisi Satuan Pengawasan Intern' },
-  { value: 'Divisi Tanaman', label: 'DTAN - Divisi Tanaman' },
-  { value: 'Divisi Teknik dan Pengolahan', label: 'DTPL - Divisi Teknik dan Pengolahan' },
-  { value: 'Divisi Infrastruktur', label: 'DINF - Divisi Infrastruktur' },
-  { value: 'Divisi Investasi Tanaman dan Teknik Pengolahan', label: 'DITP - Divisi Investasi Tanaman dan Teknik Pengolahan' },
-  { value: 'Divisi Pemasaran', label: 'DPSN - Divisi Pemasaran' },
-  { value: 'Divisi Rantai Pasok dan Logistik', label: 'DRPL - Divisi Rantai Pasok dan Logistik' },
-  { value: 'Divisi Pengadaan', label: 'DPEN - Divisi Pengadaan' },
-  { value: 'Divisi Strategi Perusahaan dan Pengendalian Kinerja Anak Perusahaan', label: 'DSPK - Divisi Strategi Perusahaan dan Pengendalian Kinerja Anak Perusahaan' },
-  { value: 'Divisi Sistem Manajemen dan Sustainability', label: 'DSMS - Divisi Sistem Manajemen dan Sustainability' },
-  { value: 'Divisi Riset, Kemitraan Strategis dan Manajemen Aset', label: 'DRKM - Divisi Riset, Kemitraan Strategis dan Manajemen Aset' },
-  { value: 'Divisi Pengembangan Bisnis dan Hilirisasi', label: 'DPBH - Divisi Pengembangan Bisnis dan Hilirisasi' },
-  { value: 'Divisi Perbendaharaan, Anggaran dan Keuangan Strategis', label: 'DPAS - Divisi Perbendaharaan, Anggaran dan Keuangan Strategis' },
-  { value: 'Divisi Akuntansi dan Perpajakan', label: 'DAPN - Divisi Akuntansi dan Perpajakan' },
-  { value: 'Divisi Manajemen Risiko', label: 'DMRS - Divisi Manajemen Risiko' },
-  { value: 'Divisi Pengembangan SDM dan Budaya', label: 'DPSB - Divisi Pengembangan SDM dan Budaya' },
-  { value: 'Divisi Operasional SDM', label: 'DSDM - Divisi Operasional SDM' },
-  { value: 'Divisi HPS dan Umum', label: 'DHPU - Divisi HPS dan Umum' },
-  { value: 'Divisi Teknologi Informasi', label: 'DTIS - Divisi Teknologi Informasi' },
-  { value: 'Divisi Hubungan Kelembagaan dan TJSL', label: 'DHKT - Divisi Hubungan Kelembagaan dan TJSL' },
-  { value: 'Divisi Hukum', label: 'DHKM - Divisi Hukum' },
-  { value: 'Divisi PSR dan Plasma', label: 'DPSR - Divisi PSR dan Plasma' },
-  { value: 'Project Management Office', label: 'DPMO - Project Management Office' }
-];
-
 export default function RegisterPage() {
   const router = useRouter();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
 
-  const [unitKerja, setUnitKerja] = useState<string | null>('');
-  const [division, setDivision] = useState('');
+  const [workUnitOptions, setWorkUnitOptions] = useState<{ value: string; label: string }[]>([]);
+  const [divisionOptions, setDivisionOptions] = useState<{ value: string; label: string }[]>([]);
+
+  const [workUnit, setWorkUnit] = useState<string | null>('');
+  const [division, setDivision] = useState<string | null>('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchWorkUnit = async () => {
+      const { data, error } = await supabase
+        .from('work_unit')
+        .select('id, name');
+
+      if (data) {
+        setWorkUnitOptions(data.map(unit => ({
+          value: unit.id,
+          label: unit.name
+        })));
+      }
+    };
+
+    fetchWorkUnit();
+  }, []);
+
+  useEffect(() => {
+    const fetchDivisions = async () => {
+      if (workUnit === 'Head Office') {
+        const { data, error } = await supabase
+          .from('divisions')
+          .select('code, name')
+          .eq('work_unit_id', 'Head Office');
+
+        if (data) {
+          setDivisionOptions(data.map(div => ({
+            value: div.name,
+            label: `${div.code} - ${div.name}`
+          })));
+        }
+      } else {
+        setDivisionOptions([]);
+        setDivision('');
+      }
+    };
+
+    fetchDivisions();
+  }, [workUnit]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      if (!unitKerja || (unitKerja === 'Head Office' && !division)) {
+      if (!workUnit || (workUnit === 'Head Office' && !division)) {
         notifications.show({
           title: 'Data Belum Lengkap',
           message: 'Harap pilih Unit Kerja dan Divisi Anda.',
@@ -86,8 +92,8 @@ export default function RegisterPage() {
             id: authData.user.id,
             email,
             full_name: fullName,
-            unit_kerja: unitKerja,
-            division: unitKerja === 'Head Office' ? division : ' ',
+            unit_kerja: workUnit,
+            division: workUnit === 'Head Office' ? division : ' ',
             role: 'User',
           },
         ]);
@@ -98,7 +104,7 @@ export default function RegisterPage() {
 
         notifications.show({
           title: 'Registrasi Sukses',
-          message: 'Akun Anda berhasil terdaftar. Mengalihkan...',
+          message: 'Akun Anda berhasil terdaftar. Mengalihkan ke halaman login...',
           color: 'green',
           autoClose: 3000,
         });
@@ -130,10 +136,10 @@ export default function RegisterPage() {
               <IconChecklist size={32} color="#0e422a" />
             </Box>
             <Group gap={4} mt={4}>
-              <Text fw={900} size="24px" lts="tight" c="ptpn4Green.9">DocuTrack.</Text>
+              <Text fw={900} size="24px" lts="tight" c="ptpn4Green.9">{process.env.NEXT_PUBLIC_APP_NAME}</Text>
             </Group>
             <Text size="xs" c="dimmed" ta="center" fw={500}>
-              PalmCo Request Monitoring System
+              Sistem Pengajuan Dokumen HO
             </Text>
           </Stack>
 
@@ -162,19 +168,17 @@ export default function RegisterPage() {
                 }}
               />
 
-              {}
               <Select
                 label="Unit Kerja"
-                placeholder="Pilih atau cari unit kerja"
-                data={locationData}
+                placeholder="Pilih atau cari unit kerja anda"
+                data={workUnitOptions}
                 searchable
                 clearable
                 nothingFoundMessage="Unit kerja tidak ditemukan.."
                 required
-                value={unitKerja}
+                value={workUnit}
                 onChange={(value) => {
-                  setUnitKerja(value);
-                  setDivision('');
+                  setWorkUnit(value);
                 }}
                 leftSection={<IconBriefcase size={16} stroke={1.5} color="#94a3b8" />}
                 radius="md"
@@ -190,17 +194,17 @@ export default function RegisterPage() {
                 }}
               />
 
-              {unitKerja === 'Head Office' && (
+              {workUnit === 'Head Office' && (
                 <Select
                   label="Divisi"
                   placeholder="Cari atau pilih divisi anda"
-                  data={hoDivisionData}
+                  data={divisionOptions}
                   searchable
                   clearable
                   nothingFoundMessage="Divisi tidak ditemukan.."
                   required
                   value={division}
-                  onChange={(value) => setDivision(value || '')}
+                  onChange={setDivision}
                   leftSection={<IconBriefcase size={16} stroke={1.5} color="#94a3b8" />}
                   radius="md"
                   styles={{

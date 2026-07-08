@@ -88,10 +88,10 @@ export default function LoginPage() {
               <IconChecklist size={32} color="#0e422a" />
             </Box>
             <Group gap={4} mt={4}>
-              <Text fw={900} size="24px" lts="tight" c="ptpn4Green.9">DocuTrack.</Text>
+              <Text fw={900} size="24px" lts="tight" c="ptpn4Green.9">{process.env.NEXT_PUBLIC_APP_NAME}</Text>
             </Group>
             <Text size="xs" c="dimmed" ta="center" fw={500}>
-              PalmCo Request Monitoring System
+              Sistem Pengajuan Dokumen HO
             </Text>
           </Stack>
 

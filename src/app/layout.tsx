@@ -2,6 +2,12 @@ import '@mantine/core/styles.css';
 import { ColorSchemeScript, MantineProvider, createTheme } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import '@mantine/notifications/styles.css';
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: `${process.env.NEXT_PUBLIC_APP_NAME} - Sistem Pengajuan Dokumen HO`,
+  description: 'Sistem Pengajuan Dokumen HO',
+};
 
 const ptpn4Theme = createTheme({ 
   fontFamily: 'Plus Jakarta Sans, Inter, sans-serif',
