@@ -69,6 +69,7 @@ export default function UserDashboard() {
 
   const [activeMenu, setActiveMenu] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<string | null>('date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>('desc');
 
@@ -207,19 +208,19 @@ export default function UserDashboard() {
     if (!userProfile || !categoryId) return;
 
     if (categoryId === '4' && !subCategory) {
-      notifications.show({ title: 'Data Belum Lengkap', 
+      notifications.show({ title: 'Data Belum Lengkap',
         message: 'Harap pilih sub-kategori tiket Anda sebelum mengirim.', color: 'orange' });
       return;
     }
 
     if (!urgency) {
-      notifications.show({ title: 'Data Belum Lengkap', 
+      notifications.show({ title: 'Data Belum Lengkap',
         message: 'Harap tentukan Tingkat Urgensi pengajuan.', color: 'orange' });
       return;
     }
 
     if (!isTiketCategory && files.length === 0) {
-      notifications.show({ title: 'Dokumen Wajib Dilampirkan', 
+      notifications.show({ title: 'Dokumen Wajib Dilampirkan',
         message: 'Silakan unggah dokumen pengajuan dalam format PDF.', color: 'red' });
       return;
     }
@@ -320,15 +321,15 @@ export default function UserDashboard() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             ticketNumber: ticketNumber,
-            title: requestTitle,
-            status: 'Dikirim (Menunggu Antrean)',
-            notes: 'Dokumen berhasil masuk ke sistem antrean pusat dan menunggu penanganan oleh PIC.',
-            recipientEmail: userProfile?.email,
-            recipientName: userProfile?.fullName
+            title: `[TINDAKAN DIPERLUKAN] ${requestTitle}`,
+            status: 'Tiket Baru Masuk ke Sistem',
+            notes: `Pengaju: ${userProfile?.fullName}. Mohon segera buka dashboard untuk menangani/menugaskan tiket ini ke PIC.`,
+            recipientEmail: 'mhafr2112@gmail.com',
+            recipientName: 'Koordinator Helpdesk'
           }),
         });
-      } catch (emailErr) {
-        console.error('Gagal mengirimkan email notifikasi:', emailErr);
+      } catch (adminEmailErr) {
+        console.error('Gagal kirim notif tiket baru ke Admin:', adminEmailErr);
       }
 
       notifications.show({
@@ -373,6 +374,14 @@ export default function UserDashboard() {
 
   const getFilteredAndSortedRequests = () => {
     let filtered = [...myRequests];
+
+    if (activeFilter === 'process') {
+      filtered = filtered.filter(r => r.status.startsWith('Dalam Proses') || r.status === 'Dikirim');
+    } else if (activeFilter === 'hold') {
+      filtered = filtered.filter(r => r.status.startsWith('Sedang Ditangguhkan') || r.status.startsWith('Sedang Ditahan'));
+    } else if (activeFilter === 'archived') {
+      filtered = filtered.filter(r => r.status === 'Disetujui' || r.status === 'Ditolak' || r.status === 'Selesai (Rilis PRD)');
+    }
 
     if (searchQuery.trim() !== '') {
       const cleanQuery = searchQuery.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
@@ -437,6 +446,18 @@ export default function UserDashboard() {
       const netSlaDays = totalElapsedDays - (newTotalHoldDays || 0);
 
       return netSlaDays <= 0 ? '1 Hari' : `${netSlaDays} Hari`;
+  };
+
+  const checkIfOverdue = (createdAt: string, slaDays: number, status: string) => {
+    if (status === 'Selesai' || status === 'Selesai (Rilis PRD)' || status === 'Disetujui' || status === 'Ditolak') return false;
+    if (!slaDays) return false;
+
+    const createdDate = new Date(createdAt).getTime();
+    const currentDate = new Date().getTime();
+
+    const diffInDays = (currentDate - createdDate) / (1000 * 60 * 60 * 24);
+
+    return diffInDays > slaDays;
   };
 
   const totalCount = myRequests.length;
@@ -616,22 +637,47 @@ export default function UserDashboard() {
             </Box>
 
             <SimpleGrid cols={{ base: 1, sm: 4 }} spacing="lg" mb="xl">
-              <Paper bg="ptpn4Green.9" p="xl" style={{ position: 'relative', color: '#fff' }}>
-                <Text size="xs" fw={700} c="ptpn4Green.2" lts="0.5px">TOTAL PENGAJUAN SAYA</Text>
+              <Paper
+                bg={activeFilter === null ? 'ptpn4Green.9' : 'slateClean.1'}
+                p="xl"
+                onClick={() => setActiveFilter(null)}
+                style={{
+                  cursor: 'pointer',
+                  color: activeFilter === null ? '#fff' : '#475569',
+                  transition: 'all 0.2s ease',
+                  boxShadow: activeFilter === null ? '0 4px 12px rgba(14, 66, 42, 0.2)' : 'none'
+                }}
+              >
+                <Text size="xs" fw={700} c={activeFilter === null ? 'ptpn4Green.2' : 'dimmed'} lts="0.5px">TOTAL PENGAJUAN SAYA</Text>
                 <Text size="36px" fw={800} my="xs">{totalCount}</Text>
-                <Text size="xs" c="ptpn4Green.1" fw={500}>Seluruh riwayat pengajuan</Text>
+                <Text size="xs" c={activeFilter === null ? 'ptpn4Green.1' : 'dimmed'} fw={500}>Seluruh riwayat pengajuan</Text>
               </Paper>
-              <Paper p="xl">
+
+              <Paper
+                p="xl"
+                onClick={() => setActiveFilter('process')}
+                style={{ cursor: 'pointer', outline: activeFilter === 'process' ? '2px solid #228be6' : 'none', transition: 'all 0.2s' }}
+              >
                 <Text size="xs" fw={700} c="slateClean.4" lts="0.5px">TIKET DALAM PROSES</Text>
                 <Text size="36px" fw={800} my="xs" c="slateClean.9">{processCount}</Text>
                 <Text size="xs" c="blue.6" fw={500}>Dalam peninjauan</Text>
               </Paper>
-              <Paper p="xl">
+
+              <Paper
+                p="xl"
+                onClick={() => setActiveFilter('hold')}
+                style={{ cursor: 'pointer', outline: activeFilter === 'hold' ? '2px solid #f59e0b' : 'none', transition: 'all 0.2s' }}
+              >
                 <Text size="xs" fw={700} c="slateClean.4" lts="0.5px">TIKET DITANGGUHKAN</Text>
                 <Text size="36px" fw={800} my="xs" c="slateClean.9">{holdCount}</Text>
                 <Text size="xs" c="orange.6" fw={500}>Penangguhan aktif</Text>
               </Paper>
-              <Paper p="xl">
+
+              <Paper
+                p="xl"
+                onClick={() => setActiveFilter('archived')}
+                style={{ cursor: 'pointer', outline: activeFilter === 'archived' ? '2px solid #10b981' : 'none', transition: 'all 0.2s' }}
+              >
                 <Text size="xs" fw={700} c="slateClean.4" lts="0.5px">TIKET SELESAI</Text>
                 <Text size="36px" fw={800} my="xs" c="slateClean.9">{archivedCount}</Text>
                 <Text size="xs" c="green.6" fw={500}>Telah diselesaikan</Text>
@@ -639,15 +685,29 @@ export default function UserDashboard() {
             </SimpleGrid>
 
             <Paper p="xl">
-              <TextInput
-                placeholder="Ketik nomor tiket secara dinamis (cth: req2026)..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                leftSection={<IconSearch size={16} stroke={1.5} color="#64748b" />}
-                mb="xl"
-                w={{ base: '100%', sm: 340 }}
-                styles={{ input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' } }}
-              />
+              <Group mb="xl" gap="sm" align="center">
+                <TextInput
+                  placeholder="Ketik nomor tiket secara dinamis..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  leftSection={<IconSearch size={16} stroke={1.5} color="#64748b" />}
+                  w={{ base: '100%', sm: 340 }}
+                  styles={{ input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' } }}
+                />
+
+                {activeFilter && (
+                  <Button
+                    variant="light"
+                    color="gray"
+                    size="sm"
+                    radius="md"
+                    onClick={() => setActiveFilter(null)}
+                    leftSection={<IconX size={14} />}
+                  >
+                    Hapus Filter
+                  </Button>
+                )}
+              </Group>
 
               <Table verticalSpacing="md" horizontalSpacing="md" highlightOnHover variant="simple" striped>
                 <Table.Thead bg="slateClean.0">
@@ -688,12 +748,24 @@ export default function UserDashboard() {
                     getFilteredAndSortedRequests().map((req) => {
                       const finalAttachment = req.attachments?.find((att: any) => att.type === 'Dokumen_Final');
 
-                      const effectiveSlaDays = (req.categories?.id === 4 || req.categories?.name === 'Tiket')
-                        ? req.sub_categories?.sla_days
-                        : req.categories?.sla_days;
+                      const effectiveSlaDays = (req.categories?.id === 4 || req.categories?.name === 'Tiket Lainnya')
+                      ? req.sub_categories?.sla_days
+                      : req.categories?.sla_days;
+
+                      const isOverdue = checkIfOverdue(req.created_at, effectiveSlaDays ?? 0, req.status);
+
+                      const getUrgencyColor = (urgency: string) => {
+                        if (urgency === 'Tinggi') return 'red';
+                        if (urgency === 'Sedang') return 'orange';
+                        return 'gray';
+                      };
 
                       return (
-                        <Table.Tr key={req.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <Table.Tr key={req.id} style={{ 
+                          borderBottom: '1px solid #f1f5f9',
+                          backgroundColor: isOverdue ? '#fff5f5' : 'undefined', 
+                          transition: 'background-color 0.2s ease'
+                           }}>
                           <Table.Td>
                             <Stack gap={2} align="flex-start">
                             <Tooltip label="Klik untuk melihat riwayat pengajuan" position="top" withArrow>
@@ -723,9 +795,8 @@ export default function UserDashboard() {
                             <Text size="sm" fw={500} c="slateClean.7">{req.request_title}</Text>
                             <Text size="11px" c="dimmed">
                               {req.categories?.name || 'Tidak Diketahui'}
-                                {(req.categories?.id === 4 || req.categories?.name === 'Tiket Lainnya')
-                                && req.sub_categories?.name ? ` (${req.sub_categories.name}) ` : ' '}
-                               | Batas: {effectiveSlaDays ?? 0} Hari
+                              {req.sub_categories?.name ? ` (${req.sub_categories.name}) ` : ' '}
+                              | Batas: {effectiveSlaDays ?? 0} Hari
                             </Text>
                           </Table.Td>
 

@@ -71,6 +71,7 @@
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>('desc');
 
     const [searchQuery, setSearchQuery] = useState('');
+    const [activeFilter, setActiveFilter] = useState<string | null>(null);
 
     const [selectedDetail, setSelectedDetail] = useState<RequestItem | null>(null);
 
@@ -256,7 +257,7 @@
                   recipientName: payload.recipientName
                 }),
               });
-              
+
               if (!emailRes.ok) {
                  const err = await emailRes.json();
                  console.error('Email notifikasi delegasi gagal dikirim karena ditolak oleh API:', err);
@@ -507,8 +508,8 @@
             if (!emailRes.ok) {
                console.error('API Resend menolak pengiriman email saat melepas penangguhan.');
             }
-          } catch (e) { 
-            console.error('Jaringan terputus saat email pelepasan penanggguhan:', e); 
+          } catch (e) {
+            console.error('Jaringan terputus saat email pelepasan penanggguhan:', e);
           }
 
           setRequests((prev) => prev.map((r) => (r.id === req.id ? { ...r, status: nextStatus, updated_at: nowStr } : r)));
@@ -663,17 +664,26 @@
     const archivedCount = requests.filter(r => r.status === 'Disetujui' || r.status === 'Ditolak').length;
 
     const getFilteredAndSortedRequests = () => {
-
       let filtered = [...requests];
+
+      if (activeFilter === 'unassigned') {
+        filtered = filtered.filter(r => r.status === 'Dikirim');
+      } else if (activeFilter === 'process') {
+        filtered = filtered.filter(r => r.status.startsWith('Dalam Proses'));
+      } else if (activeFilter === 'hold') {
+        filtered = filtered.filter(r => r.status.startsWith('Sedang Ditangguhkan'));
+      } else if (activeFilter === 'archived') {
+        filtered = filtered.filter(r => r.status === 'Disetujui' || r.status === 'Ditolak');
+      }
 
       if (searchQuery.trim() !== '') {
         const cleanQuery = searchQuery.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-
         filtered = filtered.filter((req) => {
           const cleanTicket = req.ticket_number.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
           return cleanTicket.includes(cleanQuery);
         });
       }
+
       if (!sortKey || !sortDirection) return filtered;
 
       return [...filtered].sort((a, b) => {
@@ -775,15 +785,29 @@
           </Box>
 
           <SimpleGrid cols={{ base: 1, sm: 5 }} spacing="lg" mb="xl">
-            <Paper bg="ptpn4Green.9" p="xl" style={{ position: 'relative', color: '#fff' }}>
-              <Text size="xs" fw={700} c="ptpn4Green.2" lts="0.5px">TOTAL TIKET MASUK</Text>
+            <Paper
+              bg={activeFilter === null ? 'ptpn4Green.9' : 'slateClean.1'}
+              p="xl"
+              onClick={() => setActiveFilter(null)}
+              style={{
+                cursor: 'pointer',
+                color: activeFilter === null ? '#fff' : '#475569',
+                transition: 'all 0.2s ease',
+                boxShadow: activeFilter === null ? '0 4px 12px rgba(14, 66, 42, 0.2)' : 'none'
+              }}
+            >
+              <Text size="xs" fw={700} c={activeFilter === null ? 'ptpn4Green.2' : 'dimmed'} lts="0.5px">TOTAL TIKET MASUK</Text>
               <Text size="36px" fw={800} my="xs">{loading ? '...' : totalCount}</Text>
-              <Text size="xs" c="ptpn4Green.1" fw={500}>Seluruh riwayat pengajuan</Text>
+              <Text size="xs" c={activeFilter === null ? 'ptpn4Green.1' : 'dimmed'} fw={500}>Semua pengajuan</Text>
             </Paper>
 
-            <Paper p="xl">
+            <Paper
+              p="xl"
+              onClick={() => setActiveFilter('unassigned')}
+              style={{ cursor: 'pointer', outline: activeFilter === 'unassigned' ? '2px solid #ef4444' : 'none', transition: 'all 0.2s' }}
+            >
               <Group justify="space-between" wrap="nowrap">
-                <Text size="xs" fw={700} c="slateClean.4" lts="0.5px">TIKET MENUNGGU RESPON</Text>
+                <Text size="xs" fw={700} c="slateClean.4" lts="0.5px">MENUNGGU RESPON</Text>
               </Group>
               <Text size="36px" fw={800} my="xs" c={unassignedCount > 0 ? "slateClean.9" : "slateClean.9"}>
                 {loading ? '...' : unassignedCount}
@@ -791,19 +815,31 @@
               <Text size="xs" c="#ef4444" fw={500}>Tiket belum diproses</Text>
             </Paper>
 
-            <Paper p="xl">
-              <Text size="xs" fw={700} c="slateClean.4" lts="0.5px">TIKET DALAM PROSES</Text>
+            <Paper
+              p="xl"
+              onClick={() => setActiveFilter('process')}
+              style={{ cursor: 'pointer', outline: activeFilter === 'process' ? '2px solid #228be6' : 'none', transition: 'all 0.2s' }}
+            >
+              <Text size="xs" fw={700} c="slateClean.4" lts="0.5px">DALAM PROSES</Text>
               <Text size="36px" fw={800} my="xs" c="slateClean.9">{loading ? '...' : processCount}</Text>
-              <Text size="xs" c="blue.6" fw={500}>Dalam proses peninjauan</Text>
+              <Text size="xs" c="blue.6" fw={500}>Sedang ditinjau</Text>
             </Paper>
 
-            <Paper p="xl">
-              <Text size="xs" fw={700} c="slateClean.4" lts="0.5px">TIKET DITANGGUHKAN</Text>
+            <Paper
+              p="xl"
+              onClick={() => setActiveFilter('hold')}
+              style={{ cursor: 'pointer', outline: activeFilter === 'hold' ? '2px solid #f59e0b' : 'none', transition: 'all 0.2s' }}
+            >
+              <Text size="xs" fw={700} c="slateClean.4" lts="0.5px">DITANGGUHKAN</Text>
               <Text size="36px" fw={800} my="xs" c="slateClean.9">{loading ? '...' : holdCount}</Text>
               <Text size="xs" c="orange.6" fw={500}>Penangguhan aktif</Text>
             </Paper>
 
-            <Paper p="xl">
+            <Paper
+              p="xl"
+              onClick={() => setActiveFilter('archived')}
+              style={{ cursor: 'pointer', outline: activeFilter === 'archived' ? '2px solid #10b981' : 'none', transition: 'all 0.2s' }}
+            >
               <Text size="xs" fw={700} c="slateClean.4" lts="0.5px">TIKET SELESAI</Text>
               <Text size="36px" fw={800} my="xs" c="slateClean.9">{loading ? '...' : archivedCount}</Text>
               <Text size="xs" c="green.6" fw={500}>Telah diselesaikan</Text>
@@ -816,15 +852,29 @@
             ) : (
 
               <Box>
-              <TextInput
-                  placeholder="Cari Nomor Tiket..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  leftSection={<IconSearch size={16} stroke={1.5} color="#64748b" />}
-                  mb="xl"
-                  w={{ base: '100%', sm: 360 }}
-                  styles={{ input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' } }}
-                />
+                <Group mb="xl" gap="sm" align="center">
+                    <TextInput
+                      placeholder="Cari Nomor Tiket..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      leftSection={<IconSearch size={16} stroke={1.5} color="#64748b" />}
+                      w={{ base: '100%', sm: 360 }}
+                      styles={{ input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' } }}
+                    />
+                    
+                    {activeFilter && (
+                      <Button 
+                        variant="light" 
+                        color="gray" 
+                        size="sm" 
+                        radius="md" 
+                        onClick={() => setActiveFilter(null)}
+                        leftSection={<IconX size={14} />}
+                      >
+                        Hapus Filter
+                      </Button>
+                    )}
+                  </Group>
 
               <Table verticalSpacing="md" horizontalSpacing="md" highlightOnHover variant="simple" striped >
                 <Table.Thead bg="slateClean.0">
@@ -887,7 +937,7 @@
                     };
 
                     return (
-                      <Table.Tr key={req.id} style={{ borderBottom: '1px solid #f1f5f9', 
+                      <Table.Tr key={req.id} style={{ borderBottom: '1px solid #f1f5f9',
                         backgroundColor: isOverdue ? '#fff5f5' : 'undefined', transition: 'background-color 0.2s ease', }}>
                         <Table.Td>
                           <Stack gap={2} align="flex-start">
@@ -925,7 +975,12 @@
 
                         <Table.Td>
                           <Text size="sm" fw={500} c="slateClean.7">{req.request_title}</Text>
-                          <Text size="11px" c="dimmed">{req.categories?.name || 'Tidak Diketahui'} | Batas: {req.categories?.sla_days ?? 0} Hari</Text>
+                            <Text size="11px" c="dimmed">
+                              {req.categories?.name === 'Tiket Lainnya' && req.sub_categories?.name
+                                ? req.sub_categories.name
+                                : (req.categories?.name || 'Tidak Diketahui')}
+                              {' '} | Batas: {effectiveSlaDays ?? 0} Hari
+                            </Text>
                         </Table.Td>
 
                         <Table.Td>
@@ -1286,7 +1341,11 @@
               <Box>
                 <Text size="xs" c="dimmed" fw={600} mb={2}>JUDUL PENGAJUAN</Text>
                 <Text fw={700} size="md" c="slateClean.9" mb="xs">{selectedDetail.request_title}</Text>
-                <Badge color="blue" variant="light">{selectedDetail.categories?.name}</Badge>
+                <Badge color="blue" variant="light">
+                  {selectedDetail.categories?.name === 'Tiket Lainnya' && selectedDetail.sub_categories?.name
+                  ? selectedDetail.sub_categories.name
+                  : (selectedDetail.categories?.name || 'Tidak Diketahui')}
+                </Badge>
               </Box>
 
               {}
