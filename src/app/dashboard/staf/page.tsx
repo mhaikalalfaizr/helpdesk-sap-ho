@@ -5,11 +5,11 @@
   import { supabase } from '../../../lib/supabase';
   import { notifications } from '@mantine/notifications';
   import {
-    AppShell, SimpleGrid, Paper, Text, Group, Badge, Avatar, Table, Menu, ActionIcon, TextInput,
+    AppShell, SimpleGrid, Paper, Text, Group, Badge, Avatar, Table, Menu, ActionIcon, TextInput, NumberInput,
     NavLink, Stack, Box, Kbd, Tooltip, Modal, Timeline, FileInput, Textarea, Button, Drawer, Divider, Select
   } from '@mantine/core';
   import {
-    IconLayoutDashboard, IconFileText, IconClock, IconChecklist, IconSettings, IconLogout, IconSearch, IconBell,
+    IconLayoutDashboard, IconFileText, IconClock, IconChecklist, IconSettings, IconLogout, IconSearch, IconBell, IconPencil,
     IconMail, IconDotsVertical, IconCheck, IconX, IconAlertCircle, IconArrowUpRight, IconDownload, IconEye, IconUserShare,
     IconPlayerPause, IconPlayerPlay, IconArrowRight, IconFileCheck
   } from '@tabler/icons-react';
@@ -26,6 +26,7 @@
     profiles: { full_name: string; unit_kerja: string; division: string; email?: string } | null;
     categories: { id: number; name: string; sla_days: number } | null;
     sub_categories?: { name: string; sla_days: number } | null;
+    custom_sla_days?: number | null;
     file_url?: string | null;
     current_pic_id?: string | null;
     pic?: { full_name: string } | null;
@@ -46,7 +47,8 @@
     const router = useRouter();
 
     const [currentPicId, setCurrentPicId] = useState<string | null>(null);
-    const [currentUserName, setCurrentUserName] = useState('PIC');
+    const [currentUserName, setCurrentUserName] = useState('Staf');
+    const [currentUserRole, setCurrentUserRole] = useState<string>('');
     const [requests, setRequests] = useState<RequestItem[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -82,6 +84,12 @@
     const [selectedNewPicId, setSelectedNewPicId] = useState<string | null>(null);
     const [assigning, setAssigning] = useState(false);
 
+    const [editingSlaId, setEditingSlaId] = useState<string | null>(null);
+    const [newSlaValue, setNewSlaValue] = useState<number | ''>('');
+    const [isSavingSla, setIsSavingSla] = useState(false);
+
+    const [urgencyFilter, setUrgencyFilter] = useState<string | null>(null);
+
     useEffect(() => {
       initPic();
 
@@ -115,24 +123,24 @@
         .eq('id', user.id)
         .maybeSingle();
 
-      if (!profileData || profileData.role !== 'PIC') {
-        notifications.show({
-          title: 'Akses Ditolak',
-          message: 'Akun Anda tidak memiliki hak akses yang cukup.',
-          color: 'red',
-        });
-        await supabase.auth.signOut();
-        router.push('/login');
+      if (!profileData || (profileData.role !== 'Koordinator' && profileData.role !== 'Staf')) {
+        if (profileData?.role === 'Pengaju') {
+          router.replace('/dashboard/user');
+        } else {
+          await supabase.auth.signOut();
+          router.replace('/login');
+        }
         return;
       }
 
-      const profileName = profileData.full_name || 'PIC';
+      const profileName = profileData.full_name || 'Staf';
       setCurrentUserName(profileName);
+      setCurrentUserRole(profileData.role);
 
       const { data } = await supabase
         .from('requests')
         .select(`
-          id, ticket_number, request_title, description, status, total_hold_days, created_at, updated_at, file_url, current_pic_id, urgency,
+          id, ticket_number, request_title, description, status, total_hold_days, created_at, updated_at, file_url, current_pic_id, urgency, custom_sla_days,
           profiles:user_id (full_name, unit_kerja, division, email),
           categories:category_id (id, name, sla_days),
           sub_categories:sub_category_id (name, sla_days),
@@ -146,7 +154,7 @@
       const { data: allPics } = await supabase
         .from('profiles')
         .select('id, full_name, email')
-        .eq('role', 'PIC')
+        .in('role', ['Koordinator', 'Staf'])
         .order('full_name', { ascending: true });
 
       if (allPics) {
@@ -289,7 +297,7 @@
       }
     };
 
-    const updateDatabaseStatus = async (id: string, payload: any, logStatusName: string, notes: string = 'Sinkronisasi status birokrasi manual oleh PIC') => {
+    const updateDatabaseStatus = async (id: string, payload: any, logStatusName: string, notes: string = 'Sinkronisasi status birokrasi manual oleh Staf') => {
       try {
         const targetRequest = requests.find(r => r.id === id);
 
@@ -369,25 +377,34 @@
       }
     };
 
-    const checkIfOverdue = (createdAt: string, slaDays: number, status: string) => {
-      if (status === 'Selesai' || status === 'Selesai (Rilis PRD)' || status === 'Disetujui' || status === 'Ditolak') return false;
-      if (!slaDays) return false;
+    const checkIfOverdue = (createdAt: string, slaDays: number | null, status: string) => {
+    if (slaDays === null || status === 'Selesai' || status === 'Selesai (Rilis PRD)' || status === 'Disetujui' || status === 'Ditolak') {
+      return false;
+    }
 
-      const createdDate = new Date(createdAt).getTime();
-      const currentDate = new Date().getTime();
+    const createdDate = new Date(createdAt).getTime();
+    const currentDate = new Date().getTime();
+    const diffInDays = (currentDate - createdDate) / (1000 * 60 * 60 * 24);
 
-      const diffInDays = (currentDate - createdDate) / (1000 * 60 * 60 * 24);
+    return diffInDays > slaDays;
+  };
 
-      return diffInDays > slaDays;
-    };
+  const getCleanUrl = (rawUrl: string | undefined | null) => {
+    if (!rawUrl) return '#';
+
+    return rawUrl.replace(
+      'https://jrvwgkvwriipexnhkgri.supabase.co/storage/v1/object/public/documents',
+      '/berkas'
+    );
+  };
 
     const handleNextStep = async (req: RequestItem) => {
       let nextStatus = '';
 
       if (req.categories?.name === 'Tiket Lainnya') {
         switch (req.status) {
-          case 'Dikirim': nextStatus = 'Dalam Proses oleh PIC'; break;
-          case 'Dalam Proses oleh PIC': nextStatus = 'Dalam Tahap Elisitasi Kebutuhan Pengguna'; break;
+          case 'Dikirim': nextStatus = 'Dalam Proses oleh Staf'; break;
+          case 'Dalam Proses oleh Staf': nextStatus = 'Dalam Tahap Elisitasi Kebutuhan Pengguna'; break;
           case 'Dalam Tahap Elisitasi Kebutuhan Pengguna': nextStatus = 'Dalam Tahap Pelaporan ke Konsultan'; break;
           case 'Dalam Tahap Pelaporan ke Konsultan': nextStatus = 'Dalam Tahap Pengembangan'; break;
           case 'Dalam Tahap Pengembangan': nextStatus = 'Dalam Tahap Pengujian Penerimaan Pengguna (UAT)'; break;
@@ -403,8 +420,8 @@
 
       else {
         switch (req.status) {
-          case 'Dikirim': nextStatus = 'Dalam Proses oleh PIC'; break;
-          case 'Dalam Proses oleh PIC': nextStatus = 'Dalam Tahap Elisitasi Kebutuhan Pengguna'; break;
+          case 'Dikirim': nextStatus = 'Dalam Proses oleh Staf'; break;
+          case 'Dalam Proses oleh Staf': nextStatus = 'Dalam Tahap Elisitasi Kebutuhan Pengguna'; break;
           case 'Dalam Tahap Elisitasi Kebutuhan Pengguna': nextStatus = 'Dalam Tahap Pelaporan ke Konsultan'; break;
           case 'Dalam Tahap Pelaporan ke Konsultan': nextStatus = 'Dalam Tahap Pengembangan'; break;
           case 'Dalam Tahap Pengembangan': nextStatus = 'Dalam Tahap Pengujian Penerimaan Pengguna (UAT)'; break;
@@ -414,6 +431,35 @@
       }
 
       await updateDatabaseStatus(req.id, { status: nextStatus }, nextStatus, 'Maju ke tahap selanjutnya.');
+    };
+
+    const handleUpdateSla = async (reqId: string) => {
+      if (newSlaValue === '' || newSlaValue <= 0) {
+        notifications.show({ title: 'Invalid', message: 'Masukkan angka hari yang valid.', color: 'red' });
+        return;
+      }
+
+      setIsSavingSla(true);
+      try {
+        const { error } = await supabase
+          .from('requests')
+          .update({ custom_sla_days: newSlaValue })
+          .eq('id', reqId);
+
+        if (error) throw error;
+
+        notifications.show({ title: 'SLA Diperbarui', message: 'Target batas waktu penyelesaian berhasil diubah.', color: 'green' });
+        setEditingSlaId(null);
+
+        if (selectedDetail && selectedDetail.id === reqId) {
+          setSelectedDetail({ ...selectedDetail, custom_sla_days: Number(newSlaValue) });
+        }
+
+      } catch (error: any) {
+        notifications.show({ title: 'Gagal Update', message: error.message, color: 'red' });
+      } finally {
+        setIsSavingSla(false);
+      }
     };
 
     const handleSubmitFinalDocument = async (e: React.FormEvent) => {
@@ -468,7 +514,7 @@
       let nextStatus = '';
 
       if (req.status.startsWith('Dalam Proses oleh')) {
-        if (req.status.includes('PIC')) nextStatus = 'Sedang Ditangguhkan di PIC';
+        if (req.status.includes('Staf')) nextStatus = 'Sedang Ditangguhkan di Staf';
         else if (req.status.includes('Head Office')) nextStatus = 'Sedang Ditangguhkan di Head Office';
         else if (req.status.includes('Holding')) nextStatus = 'Sedang Ditangguhkan di Holding';
 
@@ -525,7 +571,7 @@
         }
 
       } else if (req.status.startsWith('Sedang Ditangguhkan di')) {
-        if (req.status.includes('PIC')) nextStatus = 'Dalam Proses oleh PIC';
+        if (req.status.includes('Staf')) nextStatus = 'Dalam Proses oleh Staf';
         else if (req.status.includes('Head Office')) nextStatus = 'Dalam Proses oleh Head Office';
         else if (req.status.includes('Holding')) nextStatus = 'Dalam Proses oleh Holding';
 
@@ -684,6 +730,10 @@
         });
       }
 
+      if (urgencyFilter) {
+        filtered = filtered.filter(r => r.urgency === urgencyFilter);
+      }
+
       if (!sortKey || !sortDirection) return filtered;
 
       return [...filtered].sort((a, b) => {
@@ -728,7 +778,7 @@
         <AppShell.Header bg="white" px="xl" style={{ borderBottom: '1px solid rgba(226, 232, 240, 0.8)' }}>
           <Group justify="space-between" h="100%">
             <Group gap="lg" h="100%">
-              <Avatar src={null} alt="PIC Monitor" color="ptpn4Green.9" radius="xl">PIC
+              <Avatar src={null} alt="Staf Monitor" color="ptpn4Green.9" radius="xl">Staf
               </Avatar>
                 <Box>
                   <Text size="sm" fw={600} c="slateClean.9">Halo, {currentUserName}</Text>
@@ -854,28 +904,46 @@
               <Box>
                 <Group mb="xl" gap="sm" align="center">
                     <TextInput
-                      placeholder="Cari Nomor Tiket..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      leftSection={<IconSearch size={16} stroke={1.5} color="#64748b" />}
-                      w={{ base: '100%', sm: 360 }}
-                      styles={{ input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' } }}
-                    />
-                    
-                    {activeFilter && (
-                      <Button 
-                        variant="light" 
-                        color="gray" 
-                        size="sm" 
-                        radius="md" 
-                        onClick={() => setActiveFilter(null)}
-                        leftSection={<IconX size={14} />}
-                      >
-                        Hapus Filter
-                      </Button>
-                    )}
-                  </Group>
+                    placeholder="Cari nomor tiket..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    leftSection={<IconSearch size={16} stroke={1.5} color="#64748b" />}
+                    w={{ base: '100%', sm: 300 }}
+                    styles={{ input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' } }}
+                  />
 
+                  <Select
+                    placeholder="Semua Urgensi"
+                    data={[
+                      { value: 'Tinggi', label: '🔴 Urgensi Tinggi' },
+                      { value: 'Sedang', label: '🟡 Urgensi Sedang' },
+                      { value: 'Rendah', label: '🟢 Urgensi Rendah' },
+                    ]}
+                    value={urgencyFilter}
+                    onChange={setUrgencyFilter}
+                    clearable
+                    w={{ base: '100%', sm: 200 }}
+                    styles={{ input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' } }}
+                  />
+
+                  {(activeFilter || urgencyFilter) && (
+                    <Button
+                      variant="light"
+                      color="gray"
+                      size="sm"
+                      radius="md"
+                      onClick={() => {
+                        setActiveFilter(null);
+                        setUrgencyFilter(null);
+                      }}
+                      leftSection={<IconX size={14} />}
+                    >
+                      Hapus Filter
+                    </Button>
+                  )}
+                  </Group>
+              
+              <Table.ScrollContainer minWidth={1000}>
               <Table verticalSpacing="md" horizontalSpacing="md" highlightOnHover variant="simple" striped >
                 <Table.Thead bg="slateClean.0">
                   <Table.Tr>
@@ -892,10 +960,10 @@
                     <Table.Th style={{ borderBottom: '1px solid #e2e8f0', cursor: 'pointer' }} onClick={() => handleSortRequest('duration')} w={180}>
                       <Text size="xs" fw={700} c="slateClean.5">DURASI{renderSortArrow('duration')}</Text>
                     </Table.Th>
-                    <Table.Th style={{ borderBottom: '1px solid #e2e8f0', cursor: 'pointer' }} onClick={() => handleSortRequest('status')} w={300}>
+                    <Table.Th style={{ borderBottom: '1px solid #e2e8f0', cursor: 'pointer' }} onClick={() => handleSortRequest('status')} w={280}>
                       <Text size="xs" fw={700} c="slateClean.5">STATUS{renderSortArrow('status')}</Text>
                     </Table.Th>
-                    <Table.Th style={{ borderBottom: '1px solid #e2e8f0' }} w={270}>
+                    <Table.Th style={{ borderBottom: '1px solid #e2e8f0' }} w={280}>
                       <Text size="xs" fw={900} c="slateClean.5">AKSI</Text>
                     </Table.Th>
                   </Table.Tr>
@@ -921,14 +989,17 @@
                   getFilteredAndSortedRequests().map((req) => {
                     const isFinal = req.status === 'Disetujui' || req.status === 'Ditolak' || req.status === 'Selesai (Rilis PRD)';
                     const isHoldState = req.status.startsWith('Sedang Ditangguhkan di');
-                    const canHold = req.status.includes('PIC') || req.status.includes('Head Office') || req.status.includes('Holding') || req.status.startsWith('Dalam Proses oleh');
+                    const canHold = req.status.includes('Staf') || req.status.includes('Head Office') || req.status.includes('Holding') || req.status.startsWith('Dalam Proses oleh');
                     const isLockedByOtherPic = req.current_pic_id && req.current_pic_id !== currentPicId;
+                    const canExecute = currentUserRole === 'Koordinator' || req.current_pic_id === currentPicId;
 
-                    const effectiveSlaDays = (req.categories?.id === 3 || req.categories?.name === 'Tiket Lainnya')
-                      ? req.sub_categories?.sla_days
-                      : req.categories?.sla_days;
+                    let effectiveSlaDays: number | null = 7;
 
-                    const isOverdue = checkIfOverdue(req.created_at, effectiveSlaDays ?? 0, req.status);
+                    if (req.categories?.id === 4 || req.categories?.name === 'Tiket Lainnya') {
+                      effectiveSlaDays = req.custom_sla_days ?? null;
+                    }
+
+                    const isOverdue = checkIfOverdue(req.created_at, effectiveSlaDays, req.status);
 
                     const getUrgencyColor = (urgency: string) => {
                       if (urgency === 'Tinggi') return 'red';
@@ -979,7 +1050,7 @@
                               {req.categories?.name === 'Tiket Lainnya' && req.sub_categories?.name
                                 ? req.sub_categories.name
                                 : (req.categories?.name || 'Tidak Diketahui')}
-                              {' '} | Batas: {effectiveSlaDays ?? 0} Hari
+                              {' '} | Batas: {effectiveSlaDays !== null ? `${effectiveSlaDays} Hari` : 'Belum Ditentukan'}
                             </Text>
                         </Table.Td>
 
@@ -1021,9 +1092,13 @@
                               <Text size="xs" c="slateClean.4" fw={500} style={{ fontStyle: 'italic' }}>
                                 Pengajuan Selesai Diproses
                               </Text>
-                            ) : isLockedByOtherPic ? (
+                            ) : isLockedByOtherPic && currentUserRole !== 'Koordinator' ? (
                               <Badge color="gray.4" variant="outline" radius="sm" c="dimmed" size="md" fw="500" style={{ borderStyle: 'dashed', textTransform: 'none' }}>
                                 🔒 Ditangani oleh {req.pic?.full_name}
+                              </Badge>
+                            ) : !canExecute ? (
+                              <Badge color="gray.4" variant="outline" radius="sm" c="dimmed" size="md" fw="500" style={{ borderStyle: 'dashed', textTransform: 'none' }}>
+                                🔒 Menunggu Penugasan dari Koordinator
                               </Badge>
                             ) : (
                               <>
@@ -1045,7 +1120,7 @@
                                   </ActionIcon>
                                 </Tooltip>
 
-                                <Tooltip label="Delegasikan ke PIC lain" position="top" withArrow>
+                                <Tooltip label="Delegasikan ke Staf lain" position="top" withArrow>
                                   <ActionIcon
                                     size="md"
                                     variant="light"
@@ -1093,6 +1168,7 @@
                 )}
               </Table.Tbody>
               </Table>
+              </Table.ScrollContainer>
               </Box>
             )}
           </Paper>
@@ -1275,12 +1351,12 @@
         >
           <Stack gap="md">
             <Text size="sm" c="slateClean.7">
-              Pilih staff PIC dari daftar di bawah ini untuk menangani tiket nomor <b>{assignRequest?.ticket_number}</b>.
+              Pilih staff Staf dari daftar di bawah ini untuk menangani tiket nomor <b>{assignRequest?.ticket_number}</b>.
             </Text>
 
             <Select
-              label="Pilih Penanggung Jawab (PIC)"
-              placeholder="Cari nama staff PIC..."
+              label="Pilih Penanggung Jawab (Staf)"
+              placeholder="Cari nama Staf..."
               data={picList}
               searchable
               clearable
@@ -1348,6 +1424,51 @@
                 </Badge>
               </Box>
 
+              <Box>
+                <Text size="xs" c="dimmed" fw={600} mb={4}>TARGET BATAS WAKTU (SLA)</Text>
+
+                {editingSlaId === selectedDetail.id ? (
+                  <Group gap="xs">
+                    <NumberInput
+                      value={newSlaValue}
+                      onChange={(val) => setNewSlaValue(val as number | '')}
+                      min={1}
+                      max={365}
+                      size="xs"
+                      w={100}
+                      placeholder="Hari"
+                    />
+                    <Button size="xs" color="ptpn4Green.9" loading={isSavingSla} onClick={() => handleUpdateSla(selectedDetail.id)}>
+                      Simpan
+                    </Button>
+                    <Button size="xs" variant="subtle" color="gray" onClick={() => setEditingSlaId(null)}>
+                      Batal
+                    </Button>
+                  </Group>
+                ) : (
+                  <Group gap="xs">
+                    <Text size="sm" fw={600} c="slateClean.8">
+                      {selectedDetail.categories?.id === 4 || selectedDetail.categories?.name === 'Tiket Lainnya'
+                         ? (selectedDetail.custom_sla_days ? `${selectedDetail.custom_sla_days} Hari` : 'Belum Ditentukan')
+                         : `${selectedDetail.categories?.sla_days} Hari (Standar)`
+                      }
+                    </Text>
+
+                    {(selectedDetail.categories?.id === 4 || selectedDetail.categories?.name === 'Tiket Lainnya') &&
+                     (currentUserRole === 'Koordinator' || selectedDetail.current_pic_id === currentPicId) && (
+                      <Tooltip label="Ubah batas waktu SLA" position="top">
+                        <ActionIcon size="sm" variant="subtle" color="blue" onClick={() => {
+                          setEditingSlaId(selectedDetail.id);
+                          setNewSlaValue(selectedDetail.custom_sla_days || '');
+                        }}>
+                          <IconPencil size={14} />
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
+                  </Group>
+                )}
+              </Box>
+
               {}
               <Box>
                 <Text size="xs" c="dimmed" fw={600} mb={4}>DESKRIPSI & KETERANGAN DOKUMEN</Text>
@@ -1371,7 +1492,7 @@
                         <Button
                           key={file.id || idx}
                           component="a"
-                          href={file.file_url}
+                          href={getCleanUrl(file.file_url)}
                           target="_blank"
                           rel="noopener noreferrer"
                           variant="outline"
@@ -1394,7 +1515,7 @@
                     <Text size="xs" c="dimmed" fw={600} mb={4}>BERKAS LAMPIRAN AWAL</Text>
                     <Button
                       component="a"
-                      href={selectedDetail.file_url}
+                      href={getCleanUrl(selectedDetail.file_url)}
                       target="_blank"
                       rel="noopener noreferrer"
                       variant="outline"

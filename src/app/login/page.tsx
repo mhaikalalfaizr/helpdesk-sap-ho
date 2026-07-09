@@ -54,21 +54,21 @@ export default function LoginPage() {
 
         notifications.show({
           title: 'Autentikasi Berhasil',
-          message: `Selamat datang kembali, ${profileData.full_name || 'User'}. Mengalihkan ke halaman ${userRole}...`,
+          message: `Selamat datang kembali, ${profileData.full_name || 'Pengaju'}. Mengalihkan ke halaman ${userRole}...`,
           color: 'green',
           autoClose: 3000,
         });
 
-        if (userRole === 'PIC') {
-          router.push('/dashboard/pic');
+        if (userRole === 'Staf' || userRole === 'Koordinator') {
+          router.push('/dashboard/staf');
         } else {
-          router.push('/dashboard/user');
+          router.push('/dashboard/pengajuan');
         }
       }
     } catch (error: any) {
       notifications.show({
         title: 'Gagal Masuk',
-        message: error.message || 'Kredensial yang Anda masukkan salah.',
+        message: error.message || 'Email atau kata sandi yang Anda masukkan salah.',
         color: 'red',
         icon: <IconAlertCircle size={16} />,
         autoClose: 5000,

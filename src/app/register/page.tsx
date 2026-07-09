@@ -111,7 +111,7 @@ export default function RegisterPage() {
             full_name: fullName,
             unit_kerja: workUnit,
             division: workUnit === 'Head Office' ? division : ' ',
-            role: 'User',
+            role: 'Pengaju',
           },
         ]);
 

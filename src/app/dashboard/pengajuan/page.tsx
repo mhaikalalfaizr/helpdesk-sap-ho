@@ -31,6 +31,7 @@ interface MyRequestItem {
   updated_at?: string | null;
   categories: { id: number; name: string; sla_days: number } | null;
   sub_categories?: { name: string; sla_days: number } | null;
+  custom_sla_days?: number | null;
   pic?: { full_name: string } | null;
   file_url?: string | null;
   current_pic_id?: string | null;
@@ -74,6 +75,7 @@ export default function UserDashboard() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>('desc');
 
   const [urgency, setUrgency] = useState<string | null>(null);
+  const [urgencyFilter, setUrgencyFilter] = useState<string | null>(null);
 
   useEffect(() => {
 
@@ -136,13 +138,13 @@ export default function UserDashboard() {
       .eq('id', user.id)
       .maybeSingle();
 
-    if (!profile || profile.role !== 'User') {
+    if (!profile || profile.role !== 'Pengaju') {
       notifications.show({
         title: 'Akses Dialihkan',
-        message: 'Membuka dashboard PIC...',
+        message: 'Membuka dashboard Staf...',
         color: 'blue',
       });
-      router.push('/dashboard/pic');
+      router.push('/dashboard/staf');
     }
 
     if (profile) {
@@ -167,7 +169,7 @@ export default function UserDashboard() {
     const { data } = await supabase
       .from('requests')
       .select(`
-        id, ticket_number, request_title, description, status, total_hold_days, created_at, updated_at, file_url, urgency,
+        id, ticket_number, request_title, description, status, total_hold_days, created_at, updated_at, file_url, urgency, custom_sla_days,
         user_profile:user_id (full_name, division, email),
         categories:category_id (id, name, sla_days),
         sub_categories:sub_category_id (name, sla_days),
@@ -266,6 +268,7 @@ export default function UserDashboard() {
             description: description,
             status: 'Dikirim',
             file_url: primaryFileUrl,
+            custom_sla_days: categoryId === '4' ? (subCategoryOptions.find(sub => sub.value === subCategory)?.label ? 7 : null) : null,
             total_hold_days: 0,
             urgency: urgency,
           },
@@ -302,7 +305,7 @@ export default function UserDashboard() {
             ticketNumber: ticketNumber,
             title: requestTitle,
             status: 'Dikirim (Menunggu Antrean)',
-            notes: 'Dokumen Anda berhasil dikirim ke sistem dan menunggu verifikasi oleh pihak PIC.',
+            notes: 'Dokumen Anda berhasil dikirim ke sistem dan menunggu verifikasi oleh pihak Staf.',
             recipientEmail: userProfile?.email,
             recipientName: userProfile?.fullName
           }),
@@ -316,20 +319,51 @@ export default function UserDashboard() {
       }
 
       try {
-        await fetch('/api/send-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ticketNumber: ticketNumber,
-            title: `[TINDAKAN DIPERLUKAN] ${requestTitle}`,
-            status: 'Tiket Baru Masuk ke Sistem',
-            notes: `Pengaju: ${userProfile?.fullName}. Mohon segera buka dashboard untuk menangani/menugaskan tiket ini ke PIC.`,
-            recipientEmail: 'mhafr2112@gmail.com',
-            recipientName: 'Koordinator Helpdesk'
-          }),
-        });
-      } catch (adminEmailErr) {
-        console.error('Gagal kirim notif tiket baru ke Admin:', adminEmailErr);
+        const { data: koordinatorList } = await supabase
+          .from('profiles')
+          .select('email, full_name')
+          .eq('role', 'Koordinator');
+
+        if (koordinatorList && koordinatorList.length > 0) {
+          for (const koor of koordinatorList) {
+            if (!koor.email) continue;
+
+            try {
+              const emailRes = await fetch('/api/send-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  ticketNumber: ticketNumber,
+                  title: `[TIKET BARU MASUK] ${requestTitle}`,
+                  status: 'Menunggu Antrean',
+                  notes: `Tiket baru dari ${userProfile?.fullName} masuk dan butuh ditugaskan. Segera periksa dasbor pada Helpdesk SAP.`,
+                  recipientEmail: koor.email,
+                  recipientName: koor.full_name
+                }),
+              });
+
+              if (!emailRes.ok) {
+                const contentType = emailRes.headers.get("content-type");
+
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                  const errData = await emailRes.json();
+                  console.error(`API menolak email ke ${koor.full_name}:`, errData);
+                } else {
+                  const errText = await emailRes.text();
+                  console.error(`API Crash (Bukan JSON) saat kirim ke ${koor.full_name}. Status: ${emailRes.status}`);
+                  console.log("Isi HTML Error:", errText.substring(0, 200));
+                }
+              }
+
+              await new Promise(resolve => setTimeout(resolve, 1500));
+
+            } catch (err) {
+              console.error(`Gagal fetch ke API email untuk ${koor.full_name}:`, err);
+            }
+          };
+        }
+      } catch (emailBlastErr) {
+        console.error('Jaringan terputus saat mengirimkan notifikasi ke Koordinator:', emailBlastErr);
       }
 
       notifications.show({
@@ -391,6 +425,10 @@ export default function UserDashboard() {
       });
     }
 
+    if (urgencyFilter) {
+      filtered = filtered.filter(r => r.urgency === urgencyFilter);
+    }
+
     if (!sortKey || !sortDirection) return filtered;
 
     return filtered.sort((a, b) => {
@@ -448,16 +486,25 @@ export default function UserDashboard() {
       return netSlaDays <= 0 ? '1 Hari' : `${netSlaDays} Hari`;
   };
 
-  const checkIfOverdue = (createdAt: string, slaDays: number, status: string) => {
-    if (status === 'Selesai' || status === 'Selesai (Rilis PRD)' || status === 'Disetujui' || status === 'Ditolak') return false;
-    if (!slaDays) return false;
+  const checkIfOverdue = (createdAt: string, slaDays: number | null, status: string) => {
+    if (slaDays === null || status === 'Selesai' || status === 'Selesai (Rilis PRD)' || status === 'Disetujui' || status === 'Ditolak') {
+      return false;
+    }
 
     const createdDate = new Date(createdAt).getTime();
     const currentDate = new Date().getTime();
-
     const diffInDays = (currentDate - createdDate) / (1000 * 60 * 60 * 24);
 
     return diffInDays > slaDays;
+  };
+
+  const getCleanUrl = (rawUrl: string | undefined | null) => {
+    if (!rawUrl) return '#';
+
+    return rawUrl.replace(
+      'https://jrvwgkvwriipexnhkgri.supabase.co/storage/v1/object/public/documents',
+      '/berkas'
+    );
   };
 
   const totalCount = myRequests.length;
@@ -468,7 +515,7 @@ export default function UserDashboard() {
   const activeCategoryLabel = categories.find(c => c.value === categoryId)?.label || '';
   const isTiketCategory = activeCategoryLabel.toLowerCase().includes('tiket');
 
-  if (loading || !userProfile) return <Text ta="center" mt="xl" c="dimmed" fw={500}>Memuat dashboard...</Text>;
+  if (loading || !userProfile) return null;
 
   return (
     <AppShell
@@ -480,7 +527,7 @@ export default function UserDashboard() {
       <AppShell.Header bg="white" px="xl" style={{ borderBottom: '1px solid rgba(226, 232, 240, 0.8)' }}>
           <Group justify="space-between" h="100%">
             <Group gap="lg" h="100%">
-              <Avatar src={null} alt="PIC Monitor" color="ptpn4Green.9" radius="xl">PIC
+              <Avatar src={null} alt="Staf Monitor" color="ptpn4Green.9" radius="xl">Staf
               </Avatar>
                 <Box>
                   <Text size="sm" fw={600} c="slateClean.9">Halo, {currentUserName}</Text>
@@ -687,28 +734,46 @@ export default function UserDashboard() {
             <Paper p="xl">
               <Group mb="xl" gap="sm" align="center">
                 <TextInput
-                  placeholder="Ketik nomor tiket secara dinamis..."
+                  placeholder="Cari nomor tiket..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   leftSection={<IconSearch size={16} stroke={1.5} color="#64748b" />}
-                  w={{ base: '100%', sm: 340 }}
+                  w={{ base: '100%', sm: 300 }}
                   styles={{ input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' } }}
                 />
 
-                {activeFilter && (
+                <Select
+                  placeholder="Semua Urgensi"
+                  data={[
+                    { value: 'Tinggi', label: '🔴 Urgensi Tinggi' },
+                    { value: 'Sedang', label: '🟡 Urgensi Sedang' },
+                    { value: 'Rendah', label: '🟢 Urgensi Rendah' },
+                  ]}
+                  value={urgencyFilter}
+                  onChange={setUrgencyFilter}
+                  clearable
+                  w={{ base: '100%', sm: 200 }}
+                  styles={{ input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' } }}
+                />
+
+                {(activeFilter || urgencyFilter) && (
                   <Button
                     variant="light"
                     color="gray"
                     size="sm"
                     radius="md"
-                    onClick={() => setActiveFilter(null)}
+                    onClick={() => {
+                      setActiveFilter(null);
+                      setUrgencyFilter(null);
+                    }}
                     leftSection={<IconX size={14} />}
                   >
                     Hapus Filter
                   </Button>
                 )}
               </Group>
-
+              
+              <Table.ScrollContainer minWidth={1000}>
               <Table verticalSpacing="md" horizontalSpacing="md" highlightOnHover variant="simple" striped>
                 <Table.Thead bg="slateClean.0">
                   <Table.Tr>
@@ -725,7 +790,7 @@ export default function UserDashboard() {
                       <Text size="xs" fw={700} c="slateClean.5">TANGGAL KIRIM{renderSortArrow('date')}</Text>
                     </Table.Th>
                     <Table.Th w={280}>
-                      <Text size="xs" fw={700} c="slateClean.5">PIC</Text>
+                      <Text size="xs" fw={700} c="slateClean.5">Staf</Text>
                     </Table.Th>
                     <Table.Th w={300} style={{ cursor: 'pointer' }} onClick={() => handleSortRequest('status')}>
                       <Text size="xs" fw={700} c="slateClean.5">STATUS SAAT INI{renderSortArrow('status')}</Text>
@@ -748,11 +813,12 @@ export default function UserDashboard() {
                     getFilteredAndSortedRequests().map((req) => {
                       const finalAttachment = req.attachments?.find((att: any) => att.type === 'Dokumen_Final');
 
-                      const effectiveSlaDays = (req.categories?.id === 4 || req.categories?.name === 'Tiket Lainnya')
-                      ? req.sub_categories?.sla_days
-                      : req.categories?.sla_days;
+                      let effectiveSlaDays: number | null = 7;
 
-                      const isOverdue = checkIfOverdue(req.created_at, effectiveSlaDays ?? 0, req.status);
+                      if (req.categories?.id === 4 || req.categories?.name === 'Tiket Lainnya') {
+                        effectiveSlaDays = req.custom_sla_days ?? null;
+}
+                      const isOverdue = checkIfOverdue(req.created_at, effectiveSlaDays, req.status);
 
                       const getUrgencyColor = (urgency: string) => {
                         if (urgency === 'Tinggi') return 'red';
@@ -761,9 +827,9 @@ export default function UserDashboard() {
                       };
 
                       return (
-                        <Table.Tr key={req.id} style={{ 
+                        <Table.Tr key={req.id} style={{
                           borderBottom: '1px solid #f1f5f9',
-                          backgroundColor: isOverdue ? '#fff5f5' : 'undefined', 
+                          backgroundColor: isOverdue ? '#fff5f5' : 'undefined',
                           transition: 'background-color 0.2s ease'
                            }}>
                           <Table.Td>
@@ -796,7 +862,7 @@ export default function UserDashboard() {
                             <Text size="11px" c="dimmed">
                               {req.categories?.name || 'Tidak Diketahui'}
                               {req.sub_categories?.name ? ` (${req.sub_categories.name}) ` : ' '}
-                              | Batas: {effectiveSlaDays ?? 0} Hari
+                              | Batas: {effectiveSlaDays !== null ? `${effectiveSlaDays} Hari` : 'Belum Ditentukan'}
                             </Text>
                           </Table.Td>
 
@@ -829,7 +895,7 @@ export default function UserDashboard() {
                               </Group>
                             ) : (
                               <Badge color="gray.4" variant="outline" radius="sm" c="dimmed" style={{ borderStyle: 'dashed', textTransform: 'none' }}>
-                                Belum Diproses PIC
+                                Belum Diproses Staf
                               </Badge>
                             )}
                           </Table.Td>
@@ -843,7 +909,7 @@ export default function UserDashboard() {
                               {finalAttachment && (
                                 <Button
                                   component="a"
-                                  href={finalAttachment.file_url}
+                                  href={getCleanUrl(finalAttachment.file_url)}
                                   target="_blank"
                                   download
                                   size="xs"
@@ -864,6 +930,7 @@ export default function UserDashboard() {
                   )}
                 </Table.Tbody>
               </Table>
+              </Table.ScrollContainer>
             </Paper>
           </Box>
         )}
@@ -914,7 +981,7 @@ export default function UserDashboard() {
                       <Button
                         key={file.id || idx}
                         component="a"
-                        href={file.file_url}
+                        href={getCleanUrl(file.file_url)}
                         target="_blank"
                         rel="noopener noreferrer"
                         variant="outline"
