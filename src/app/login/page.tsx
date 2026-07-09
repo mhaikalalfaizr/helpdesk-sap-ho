@@ -59,6 +59,10 @@ export default function LoginPage() {
           autoClose: 3000,
         });
 
+        router.refresh();
+      
+        router.push('/dashboard/user');
+
         if (userRole === 'Staf' || userRole === 'Koordinator') {
           router.push('/dashboard/staf');
         } else {

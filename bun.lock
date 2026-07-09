@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "docutrack",
+      "name": "helpdesk-sap-ho",
       "dependencies": {
         "@mantine/core": "^9.4.0",
         "@mantine/hooks": "^9.4.0",
