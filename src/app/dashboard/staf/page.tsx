@@ -14,6 +14,8 @@
     IconPlayerPause, IconPlayerPlay, IconArrowRight, IconFileCheck
   } from '@tabler/icons-react';
 
+  import { getSlaMetrics, countWorkingDays } from '../../../utils/helpers';
+
   interface RequestItem {
     id: string;
     ticket_number: string;
@@ -89,6 +91,7 @@
     const [isSavingSla, setIsSavingSla] = useState(false);
 
     const [urgencyFilter, setUrgencyFilter] = useState<string | null>(null);
+    const [publicHolidays, setPublicHolidays] = useState<string[]>([]);
 
     useEffect(() => {
       initPic();
@@ -125,7 +128,7 @@
 
       if (!profileData || (profileData.role !== 'Koordinator' && profileData.role !== 'Staf')) {
         if (profileData?.role === 'Pengaju') {
-          router.replace('/dashboard/user');
+          router.replace('/dashboard/pengajuan');
         } else {
           await supabase.auth.signOut();
           router.replace('/login');
@@ -165,7 +168,60 @@
         })));
       }
 
+      const { data: holidayData } = await supabase.from('public_holidays').select('holiday_date');
+      if (holidayData) {
+        setPublicHolidays(holidayData.map(h => h.holiday_date));
+      }
+
       setLoading(false);
+    };
+
+  const handleDownloadSecureFile = async (rawUrl: string, providedFileName?: string) => {
+    try {
+      const pathSegments = rawUrl.split('/documents/');
+      if (pathSegments.length < 2) throw new Error("Format URL tidak valid");
+
+      const filePath = pathSegments[1];
+
+      const { data, error } = await supabase.storage.from('documents').createSignedUrl(filePath, 60);
+
+      if (error) throw error;
+
+      if (data?.signedUrl) {
+        const response = await fetch(data.signedUrl);
+        if (!response.ok) throw new Error('Server gagal merespons file.');
+
+        const blob = await response.blob();
+        const objectUrl = window.URL.createObjectURL(blob);
+
+        const link = document.createElement('a');
+        link.href = objectUrl;
+
+        let finalName = providedFileName;
+
+        if (!finalName || finalName === 'undefined') {
+          const urlParts = rawUrl.split('/');
+          finalName = urlParts[urlParts.length - 1] || 'Dokumen_Unduhan.pdf';
+        }
+
+        link.download = finalName;
+
+        document.body.appendChild(link);
+        link.click();
+
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(objectUrl);
+      }
+    } catch (err: any) {
+      notifications.show({ title: 'Akses Ditolak', message: 'Gagal mengunduh dokumen: ' + err.message, color: 'red' });
+    }
+  };
+
+    const getProjectedDate = (daysToAdd: number) => {
+      if (!daysToAdd) return '-';
+      const projected = new Date();
+      projected.setDate(projected.getDate() + daysToAdd);
+      return projected.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
     };
 
     const handleOpenTimeline = async (req: RequestItem) => {
@@ -255,11 +311,16 @@
             try {
               const emailRes = await fetch('/api/send-email', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${process.env.NEXT_PUBLIC_INTERNAL_API_KEY}`
+                },
                 body: JSON.stringify({
                   ticketNumber: assignRequest.ticket_number,
                   title: assignRequest.request_title,
-                  status: assignRequest.status,
+                  status: payload.recipientEmail === assignRequest.profiles?.email
+                            ? 'Pembaruan Penanggung Jawab'
+                            : 'Tugas Baru Dialokasikan',
                   notes: payload.notes,
                   recipientEmail: payload.recipientEmail,
                   recipientName: payload.recipientName
@@ -268,10 +329,10 @@
 
               if (!emailRes.ok) {
                  const err = await emailRes.json();
-                 console.error('Email notifikasi delegasi gagal dikirim karena ditolak oleh API:', err);
+                 console.error('Email notifikasi delegasi gagal dikirim:', err);
               }
             } catch (e) {
-              console.error('Gagal mengirim sub-email notifikasidelegasi (jaringan terputus):', e);
+              console.error('Gagal mengirim sub-email notifikasi delegasi (jaringan terputus):', e);
             }
           })
         );
@@ -301,11 +362,23 @@
       try {
         const targetRequest = requests.find(r => r.id === id);
 
-        if (targetRequest) {
+        const crucialStatuses = [
+          'Sedang Ditangguhkan di Staf',
+          'Sedang Ditangguhkan di Head Office',
+          'Sedang Ditangguhkan di Holding',
+          'Ditolak',
+          'Selesai (Rilis PRD)',
+          'Disetujui'
+        ];
+
+        if (targetRequest && crucialStatuses.includes(logStatusName)) {
           try {
             const emailRes = await fetch('/api/send-email', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.NEXT_PUBLIC_INTERNAL_API_KEY}`
+              },
               body: JSON.stringify({
                 ticketNumber: targetRequest.ticket_number,
                 title: targetRequest.request_title,
@@ -318,15 +391,10 @@
 
             if (!emailRes.ok) {
               const errData = await emailRes.json();
-              console.error('API Resend menolak pengiriman email:', errData);
-              notifications.show({
-                title: 'Email Peringatan Gagal Terkirim',
-                message: errData.error || 'Terjadi kesalahan pada sistem notifikasi email.',
-                color: 'yellow',
-              });
+              console.error('API menolak pengiriman email:', errData);
             }
           } catch (emailErr) {
-            console.error('Jaringan terputus saat mengirim email mutasi:', emailErr);
+            console.error('Jaringan terputus saat mengirim email notifikasi:', emailErr);
           }
         }
 
@@ -377,31 +445,10 @@
       }
     };
 
-    const checkIfOverdue = (createdAt: string, slaDays: number | null, status: string) => {
-    if (slaDays === null || status === 'Selesai' || status === 'Selesai (Rilis PRD)' || status === 'Disetujui' || status === 'Ditolak') {
-      return false;
-    }
-
-    const createdDate = new Date(createdAt).getTime();
-    const currentDate = new Date().getTime();
-    const diffInDays = (currentDate - createdDate) / (1000 * 60 * 60 * 24);
-
-    return diffInDays > slaDays;
-  };
-
-  const getCleanUrl = (rawUrl: string | undefined | null) => {
-    if (!rawUrl) return '#';
-
-    return rawUrl.replace(
-      'https://jrvwgkvwriipexnhkgri.supabase.co/storage/v1/object/public/documents',
-      '/berkas'
-    );
-  };
-
     const handleNextStep = async (req: RequestItem) => {
       let nextStatus = '';
 
-      if (req.categories?.name === 'Tiket Lainnya') {
+      if (req.categories?.name === 'Tiket Lainnya' || req.categories?.id === 4) {
         switch (req.status) {
           case 'Dikirim': nextStatus = 'Dalam Proses oleh Staf'; break;
           case 'Dalam Proses oleh Staf': nextStatus = 'Dalam Tahap Elisitasi Kebutuhan Pengguna'; break;
@@ -417,15 +464,11 @@
           return;
         }
       }
-
       else {
         switch (req.status) {
           case 'Dikirim': nextStatus = 'Dalam Proses oleh Staf'; break;
-          case 'Dalam Proses oleh Staf': nextStatus = 'Dalam Tahap Elisitasi Kebutuhan Pengguna'; break;
-          case 'Dalam Tahap Elisitasi Kebutuhan Pengguna': nextStatus = 'Dalam Tahap Pelaporan ke Konsultan'; break;
-          case 'Dalam Tahap Pelaporan ke Konsultan': nextStatus = 'Dalam Tahap Pengembangan'; break;
-          case 'Dalam Tahap Pengembangan': nextStatus = 'Dalam Tahap Pengujian Penerimaan Pengguna (UAT)'; break;
-          case 'Dalam Tahap Pengujian Penerimaan Pengguna (UAT)': nextStatus = 'Selesai (Rilis PRD)'; break;
+          case 'Dalam Proses oleh Staf': nextStatus = 'Dalam Proses oleh Head Office'; break;
+          case 'Dalam Proses oleh Head Office': nextStatus = 'Dalam Proses oleh Holding'; break;
           default: return;
         }
       }
@@ -540,7 +583,10 @@
           try {
             const emailRes = await fetch('/api/send-email', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.NEXT_PUBLIC_INTERNAL_API_KEY}`
+              },
               body: JSON.stringify({
                 ticketNumber: req.ticket_number,
                 title: req.request_title,
@@ -596,7 +642,7 @@
             const activeHold = holdRows[0];
             const startTime = new Date(activeHold.hold_start).getTime();
             const endTime = new Date().getTime();
-            diffDays = Math.floor((endTime - startTime) / (1000 * 60 * 60 * 24));
+            diffDays = countWorkingDays(startTime, endTime, publicHolidays);
 
             const { error: updateHoldError } = await supabase
               .from('request_holds')
@@ -627,21 +673,6 @@
           const { error: logError } = await supabase.from('request_logs').insert([
             { request_id: req.id, changed_by: currentPicId, status_before: req.status, status_after: nextStatus, notes: actualNotes }
           ]);
-
-          try {
-            await fetch('/api/send-email', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                ticketNumber: req.ticket_number,
-                title: req.request_title,
-                status: nextStatus,
-                notes: 'Pengajuan dilanjutkan ke tahap berikutnya.',
-                recipientEmail: 'mhasticmusic@gmail.com',
-                recipientName: `Stakeholder ${process.env.NEXT_PUBLIC_APP_NAME}`
-              }),
-            });
-          } catch (e) { console.error(e); }
 
           setRequests((prev) => prev.map((r) => (r.id === req.id ? { ...r, status: nextStatus, total_hold_days: newTotalHoldDays, updated_at: nowStr } : r)));
 
@@ -677,30 +708,6 @@
       } finally {
         setRejecting(false);
       }
-    };
-
-    const calculateTotalSlaDays = (createdAtString: string, status: string, newTotalHoldDays: number, updatedAtString?: string | null) => {
-      const created = new Date(createdAtString).getTime();
-      const isFinal = status === 'Disetujui' || status === 'Ditolak' || status === 'Selesai (Rilis PRD)';
-      const isCurrentlyHold = status.startsWith('Sedang Ditangguhkan di');
-
-      const endTime = (isFinal && updatedAtString)
-        ? new Date(updatedAtString).getTime()
-        : new Date().getTime();
-
-      const totalElapsedDays = Math.floor((endTime - created) / (1000 * 60 * 60 * 24));
-
-      let finalHoldDays = newTotalHoldDays || 0;
-
-      if (isCurrentlyHold && updatedAtString) {
-        const holdStart = new Date(updatedAtString).getTime();
-        const currentHoldDuration = Math.floor((new Date().getTime() - holdStart) / (1000 * 60 * 60 * 24));
-        finalHoldDays += currentHoldDuration;
-      }
-
-      const netSlaDays = totalElapsedDays - (newTotalHoldDays || 0);
-
-      return netSlaDays <= 0 ? '1 Hari' : `${netSlaDays} Hari`;
     };
 
     const totalCount = requests.length;
@@ -768,6 +775,11 @@
       return <Text component="span" size="xs" c="ptpn4Green.9" ml={5}> ▼</Text>;
     };
 
+    const handleLogout = async () => {
+      await supabase.auth.signOut();
+      router.replace('/login');
+    };
+
     return (
       <AppShell
         header={{ height: 75 }}
@@ -819,7 +831,7 @@
 
                 <Text size="xs" fw={700} c="slateClean.4" px="sm" mt="xl" mb={4} lts="0.5px">SISTEM</Text>
                 <NavLink label="Konfigurasi SLA" leftSection={<IconSettings size={18} stroke={1.5} />} py="sm" />
-                <NavLink label="Keluar Aplikasi" leftSection={<IconLogout size={18} stroke={1.5} />} color="dimmed" py="sm" onClick={() => router.push('/login')} />
+                <NavLink label="Keluar Aplikasi" leftSection={<IconLogout size={18} stroke={1.5} />} color="dimmed" py="sm" onClick={handleLogout} />
               </Stack>
             </Box>
 
@@ -834,7 +846,7 @@
             </Stack>
           </Box>
 
-          <SimpleGrid cols={{ base: 1, sm: 5 }} spacing="lg" mb="xl">
+          <SimpleGrid cols={{ base: 1, sm: 2, lg: 5 }} spacing="lg" mb="xl">
             <Paper
               bg={activeFilter === null ? 'ptpn4Green.9' : 'slateClean.1'}
               p="xl"
@@ -846,7 +858,9 @@
                 boxShadow: activeFilter === null ? '0 4px 12px rgba(14, 66, 42, 0.2)' : 'none'
               }}
             >
-              <Text size="xs" fw={700} c={activeFilter === null ? 'ptpn4Green.2' : 'dimmed'} lts="0.5px">TOTAL TIKET MASUK</Text>
+              <Text size="xs" fw={700} c={activeFilter === null ? 'ptpn4Green.2' : 'dimmed'} lts="0.5px" truncate="end">
+                TOTAL TIKET MASUK
+              </Text>
               <Text size="36px" fw={800} my="xs">{loading ? '...' : totalCount}</Text>
               <Text size="xs" c={activeFilter === null ? 'ptpn4Green.1' : 'dimmed'} fw={500}>Semua pengajuan</Text>
             </Paper>
@@ -857,7 +871,9 @@
               style={{ cursor: 'pointer', outline: activeFilter === 'unassigned' ? '2px solid #ef4444' : 'none', transition: 'all 0.2s' }}
             >
               <Group justify="space-between" wrap="nowrap">
-                <Text size="xs" fw={700} c="slateClean.4" lts="0.5px">MENUNGGU RESPON</Text>
+                <Text size="xs" fw={700} c="slateClean.4" lts="0.5px" truncate="end">
+                  MENUNGGU RESPON
+                </Text>
               </Group>
               <Text size="36px" fw={800} my="xs" c={unassignedCount > 0 ? "slateClean.9" : "slateClean.9"}>
                 {loading ? '...' : unassignedCount}
@@ -870,7 +886,9 @@
               onClick={() => setActiveFilter('process')}
               style={{ cursor: 'pointer', outline: activeFilter === 'process' ? '2px solid #228be6' : 'none', transition: 'all 0.2s' }}
             >
-              <Text size="xs" fw={700} c="slateClean.4" lts="0.5px">DALAM PROSES</Text>
+              <Text size="xs" fw={700} c="slateClean.4" lts="0.5px" truncate="end">
+                DALAM PROSES
+              </Text>
               <Text size="36px" fw={800} my="xs" c="slateClean.9">{loading ? '...' : processCount}</Text>
               <Text size="xs" c="blue.6" fw={500}>Sedang ditinjau</Text>
             </Paper>
@@ -880,7 +898,9 @@
               onClick={() => setActiveFilter('hold')}
               style={{ cursor: 'pointer', outline: activeFilter === 'hold' ? '2px solid #f59e0b' : 'none', transition: 'all 0.2s' }}
             >
-              <Text size="xs" fw={700} c="slateClean.4" lts="0.5px">DITANGGUHKAN</Text>
+              <Text size="xs" fw={700} c="slateClean.4" lts="0.5px" truncate="end">
+                DITANGGUHKAN
+              </Text>
               <Text size="36px" fw={800} my="xs" c="slateClean.9">{loading ? '...' : holdCount}</Text>
               <Text size="xs" c="orange.6" fw={500}>Penangguhan aktif</Text>
             </Paper>
@@ -890,7 +910,9 @@
               onClick={() => setActiveFilter('archived')}
               style={{ cursor: 'pointer', outline: activeFilter === 'archived' ? '2px solid #10b981' : 'none', transition: 'all 0.2s' }}
             >
-              <Text size="xs" fw={700} c="slateClean.4" lts="0.5px">TIKET SELESAI</Text>
+              <Text size="xs" fw={700} c="slateClean.4" lts="0.5px" truncate="end">
+                TIKET SELESAI
+              </Text>
               <Text size="36px" fw={800} my="xs" c="slateClean.9">{loading ? '...' : archivedCount}</Text>
               <Text size="xs" c="green.6" fw={500}>Telah diselesaikan</Text>
             </Paper>
@@ -942,7 +964,7 @@
                     </Button>
                   )}
                   </Group>
-              
+
               <Table.ScrollContainer minWidth={1000}>
               <Table verticalSpacing="md" horizontalSpacing="md" highlightOnHover variant="simple" striped >
                 <Table.Thead bg="slateClean.0">
@@ -988,28 +1010,25 @@
 
                   getFilteredAndSortedRequests().map((req) => {
                     const isFinal = req.status === 'Disetujui' || req.status === 'Ditolak' || req.status === 'Selesai (Rilis PRD)';
-                    const isHoldState = req.status.startsWith('Sedang Ditangguhkan di');
-                    const canHold = req.status.includes('Staf') || req.status.includes('Head Office') || req.status.includes('Holding') || req.status.startsWith('Dalam Proses oleh');
-                    const isLockedByOtherPic = req.current_pic_id && req.current_pic_id !== currentPicId;
-                    const canExecute = currentUserRole === 'Koordinator' || req.current_pic_id === currentPicId;
+                      const isHoldState = req.status.startsWith('Sedang Ditangguhkan di');
+                      const canHold = req.status.includes('Staf') || req.status.includes('Head Office') || req.status.includes('Holding') || req.status.startsWith('Dalam Proses oleh');
+                      const isLockedByOtherPic = req.current_pic_id && req.current_pic_id !== currentPicId;
+                      const canExecute = currentUserRole === 'Koordinator' || req.current_pic_id === currentPicId;
 
-                    let effectiveSlaDays: number | null = 7;
+                      const effectiveSlaDays = (req.categories?.id === 4 || req.categories?.name === 'Tiket Lainnya')
+                        ? (req.custom_sla_days ?? null) : 7;
 
-                    if (req.categories?.id === 4 || req.categories?.name === 'Tiket Lainnya') {
-                      effectiveSlaDays = req.custom_sla_days ?? null;
-                    }
+                      const slaMetrics = getSlaMetrics(req.created_at, req.status, req.total_hold_days, effectiveSlaDays, req.updated_at, publicHolidays);
 
-                    const isOverdue = checkIfOverdue(req.created_at, effectiveSlaDays, req.status);
-
-                    const getUrgencyColor = (urgency: string) => {
-                      if (urgency === 'Tinggi') return 'red';
-                      if (urgency === 'Sedang') return 'orange';
-                      return 'gray';
-                    };
+                      const getUrgencyColor = (urgency: string) => {
+                        if (urgency === 'Tinggi') return 'red';
+                        if (urgency === 'Sedang') return 'orange';
+                        return 'gray';
+                      };
 
                     return (
                       <Table.Tr key={req.id} style={{ borderBottom: '1px solid #f1f5f9',
-                        backgroundColor: isOverdue ? '#fff5f5' : 'undefined', transition: 'background-color 0.2s ease', }}>
+                        backgroundColor: slaMetrics.isOverdue ? '#fff5f5' : 'undefined', transition: 'background-color 0.2s ease', }}>
                         <Table.Td>
                           <Stack gap={2} align="flex-start">
                           <Tooltip label="Klik untuk melihat riwayat pengajuan" position="top" withArrow>
@@ -1057,10 +1076,10 @@
                         <Table.Td>
                           <Stack gap={2}>
                             <Text size="sm" fw={700} c="slateClean.8">
-                              {calculateTotalSlaDays(req.created_at, req.status, req.total_hold_days, req.updated_at)}
+                              {slaMetrics.displayString}
                             </Text>
-                            {req.total_hold_days >= 0 && (
-                              <Text size="11px" color="orange.7" fw={600}>Penangguhan: {req.total_hold_days} Hari</Text>
+                            {slaMetrics.finalHoldDays > 0 && (
+                              <Text size="11px" color="orange.7" fw={600}>Penangguhan: {slaMetrics.finalHoldDays} Hari</Text>
                             )}
                           </Stack>
                         </Table.Td>
@@ -1110,7 +1129,7 @@
                                     disabled={isHoldState}
                                     onClick={() => {
                                       if (req.status === 'Dalam Proses oleh Holding') {
-                                        handleNextStep(req);
+                                        setFinalUploadRequest(req);
                                       } else {
                                         setConfirmNextRequest(req);
                                       }
@@ -1185,7 +1204,7 @@
                 <Text size="xs" c="dimmed">Untuk menyelesaikan tiket ini menjadi status Disetujui, Anda wajib melampirkan dokumen final yang telah divalidasi.</Text>
                 <FileInput
                   label="Dokumen Final (.PDF)"
-                  placeholder="Pilih file PDF resmi"
+                  placeholder="Pilih berkas dokumen final..."
                   accept="application/pdf"
                   required
                   value={finalFile}
@@ -1438,6 +1457,13 @@
                       w={100}
                       placeholder="Hari"
                     />
+
+                    {newSlaValue !== '' && (
+                      <Text size="xs" c="dimmed" mt={4}>
+                        📅 Estimasi: <Text span fw={700} c="ptpn4Green.9">{getProjectedDate(Number(newSlaValue))}</Text>
+                      </Text>
+                    )}
+
                     <Button size="xs" color="ptpn4Green.9" loading={isSavingSla} onClick={() => handleUpdateSla(selectedDetail.id)}>
                       Simpan
                     </Button>
@@ -1450,7 +1476,7 @@
                     <Text size="sm" fw={600} c="slateClean.8">
                       {selectedDetail.categories?.id === 4 || selectedDetail.categories?.name === 'Tiket Lainnya'
                          ? (selectedDetail.custom_sla_days ? `${selectedDetail.custom_sla_days} Hari` : 'Belum Ditentukan')
-                         : `${selectedDetail.categories?.sla_days} Hari (Standar)`
+                         : `${selectedDetail.categories?.sla_days} Hari`
                       }
                     </Text>
 
@@ -1491,10 +1517,7 @@
                       .map((file: any, idx: number) => (
                         <Button
                           key={file.id || idx}
-                          component="a"
-                          href={getCleanUrl(file.file_url)}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                          onClick={() => handleDownloadSecureFile(file.file_url, file.file_name)}
                           variant="outline"
                           color="ptpn4Green.9"
                           fullWidth
@@ -1515,7 +1538,6 @@
                     <Text size="xs" c="dimmed" fw={600} mb={4}>BERKAS LAMPIRAN AWAL</Text>
                     <Button
                       component="a"
-                      href={getCleanUrl(selectedDetail.file_url)}
                       target="_blank"
                       rel="noopener noreferrer"
                       variant="outline"

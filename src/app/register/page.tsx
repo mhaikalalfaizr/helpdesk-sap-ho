@@ -72,8 +72,22 @@ export default function RegisterPage() {
     if (password !== confirmPassword) {
       notifications.show({
         title: 'Kata Sandi Tidak Cocok',
-        message: 'Pastikan konfirmasi kata sandi sesuai dengan kata sandi yang Anda masukkan.',
+        message: 'Pastikan konfirmasi kata sandi sesuai dengan kata sandi yang Anda masukkan sebelumnya.',
         color: 'orange',
+        icon: <IconAlertCircle size={16} />
+      });
+      setLoading(false);
+      return;
+    }
+
+    const allowedDomains = ['@gmail.com', '@sap-ho.my.id']; 
+    const isDomainAllowed = allowedDomains.some(domain => email.toLowerCase().endsWith(domain));
+
+    if (!isDomainAllowed) {
+      notifications.show({
+        title: 'Akses Ditolak',
+        message: 'Email Anda tidak memiliki akses.',
+        color: 'red',
         icon: <IconAlertCircle size={16} />
       });
       setLoading(false);
@@ -110,7 +124,7 @@ export default function RegisterPage() {
             email,
             full_name: fullName,
             unit_kerja: workUnit,
-            division: workUnit === 'Head Office' ? division : ' ',
+            division: workUnit === 'Head Office' ? division : null,
             role: 'Pengaju',
           },
         ]);
@@ -305,8 +319,7 @@ export default function RegisterPage() {
               component={Link}
               href="/login"
               fw={700}
-              color="ptpn4Green.9"
-              onClick={() => router.push('/login')}
+              color="ptpn4Green.9"  
               style={{ textDecoration: 'none' }}
             >
               Masuk

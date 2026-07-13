@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import { notifications } from '@mantine/notifications';
@@ -16,6 +16,33 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
+
+  useEffect(() => {
+    const checkActiveSession = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        const userRole = profile?.role || 'Pengaju';
+
+        if (userRole === 'Staf' || userRole === 'Koordinator') {
+          router.replace('/dashboard/staf');
+        } else {
+          router.replace('/dashboard/pengajuan');
+        }
+      } else {
+        setIsChecking(false);
+      }
+    };
+
+    checkActiveSession();
+  }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +77,7 @@ export default function LoginPage() {
           return;
         }
 
-        const userRole = (profileData.role || 'USER').toUpperCase();
+        const userRole = profileData.role || 'Pengaju';
 
         notifications.show({
           title: 'Autentikasi Berhasil',
@@ -58,10 +85,6 @@ export default function LoginPage() {
           color: 'green',
           autoClose: 3000,
         });
-
-        router.refresh();
-      
-        router.push('/dashboard/user');
 
         if (userRole === 'Staf' || userRole === 'Koordinator') {
           router.push('/dashboard/staf');
@@ -81,6 +104,14 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  if (isChecking) {
+    return (
+      <Box style={{ backgroundColor: '#f8fafc', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Text c="dimmed" size="sm">Memuat halaman..</Text>
+      </Box>
+    );
+  }
 
   return (
     <Box style={{ backgroundColor: '#f8fafc', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }} px="md">
@@ -161,7 +192,6 @@ export default function LoginPage() {
               href="/register"
               fw={700}
               color="ptpn4Green.9"
-              onClick={() => router.push('/register')}
               style={{ textDecoration: 'none' }}
             >
               Daftar Akun Baru

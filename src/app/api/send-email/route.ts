@@ -5,6 +5,11 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: Request) {
   try {
+    const authHeader = request.headers.get('authorization');
+    if (authHeader !== `Bearer ${process.env.NEXT_PUBLIC_INTERNAL_API_KEY}`) {
+      return NextResponse.json({ error: 'Akses Ditolak' }, { status: 401 });
+    }
+
     const { ticketNumber, title, status, notes, recipientEmail, recipientName } = await request.json();
 
     if (!recipientEmail || !ticketNumber || !title || !status || !recipientName) {
@@ -62,3 +67,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message || 'Terjadi kesalahan sistem, harap hubungi administrator.' }, { status: 500 });
   }
 }
+
