@@ -4,7 +4,7 @@ import Link from 'next/link';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '../../lib/supabase';
+import { createClient } from '@/lib/supabase/client';
 import { notifications } from '@mantine/notifications';
 import {
   Container, Paper, TextInput, PasswordInput, Button, Title, Text, Stack, Box, Group, Center, Divider, ActionIcon, Tooltip, Anchor
@@ -13,6 +13,7 @@ import { IconMail, IconLock, IconChecklist, IconAlertCircle } from '@tabler/icon
 
 export default function LoginPage() {
   const router = useRouter();
+  const supabase = createClient();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);

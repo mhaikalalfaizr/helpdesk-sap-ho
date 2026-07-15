@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useMemo } from 'react';
 import { notifications } from '@mantine/notifications';
-import UserDetailDrawer from '../../../components/userDetailDrawer';
+import UserDetailDrawer from '../../../../components/userDetailDrawer';
 import {
   AppShell, SimpleGrid, Paper, Text, Group, Badge, Avatar, Table, NavLink, Stack, Box, Kbd, 
   Tooltip, Modal, Timeline, FileInput, Textarea, Button, TextInput, Select, ActionIcon, Divider, Loader, Center, Drawer
@@ -15,7 +15,7 @@ import {
   IconCheck, IconX, IconArrowUpRight, IconDownload, IconPlus, IconHistory, IconInfoCircle, IconChecklist, IconFilePlus
 } from '@tabler/icons-react';
 
-import { getSlaMetrics, getStatusColor, countWorkingDays, handleDownloadSecureFile } from '../../../utils/helpers';
+import { getSlaMetrics, getStatusColor, countWorkingDays, handleDownloadSecureFile } from '../../../../utils/helpers';
 
 interface CategoryOption {
   value: string;
@@ -517,92 +517,267 @@ export default function UserDashboard() {
 
   return (
     <Box px={{ base: 'xs', sm: 'md', lg: 'xl' }} py="md">
-          <Box style={{ maxWidth: '1700px', margin: '0 auto' }}>
+          <Box>
             <Box mb="xl">
               <Stack gap="xs">
-                <Text size="28px" fw={800} c="slateClean.9" style={{ letterSpacing: '-0.5px' }}>Formulir Pengajuan Dokumen</Text>
-                <Text size="sm" c="dimmed">Isi kelengkapan data pada formulir berikut untuk mengajukan permohonan.</Text>
-             </Stack>
+                <Text size="28px" fw={800} c="slateClean.9" style={{ letterSpacing: '-0.5px' }}>Monitoring & Pelacakan Dokumen</Text>
+                <Text size="sm" c="dimmed">Pantau pengajuan anda.</Text>
+              </Stack>
             </Box>
 
+            <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="lg" mb="xl">
+              <Paper
+                bg={activeFilter === null ? 'ptpn4Green.9' : 'slateClean.1'}
+                p="xl"
+                onClick={() => setActiveFilter(null)}
+                style={{
+                  cursor: 'pointer',
+                  color: activeFilter === null ? '#fff' : '#475569',
+                  transition: 'all 0.2s ease',
+                  boxShadow: activeFilter === null ? '0 4px 12px rgba(14, 66, 42, 0.2)' : 'none'
+                }}
+              >
+                <Text size="xs" fw={700} c="slateClean.4" lts="0.5px" truncate="end">TIKET DALAM PROSES</Text>
+                <Text size="36px" fw={800} my="xs">{totalCount}</Text>
+                <Text size="xs" c={activeFilter === null ? 'ptpn4Green.1' : 'dimmed'} fw={500}>Seluruh riwayat pengajuan</Text>
+              </Paper>
+
+              <Paper
+                p="xl"
+                onClick={() => setActiveFilter('process')}
+                style={{ cursor: 'pointer', outline: activeFilter === 'process' ? '2px solid #228be6' : 'none', transition: 'all 0.2s' }}
+              >
+                <Text size="xs" fw={700} c="slateClean.4" lts="0.5px" truncate="end">TIKET DALAM PROSES</Text>
+                <Text size="36px" fw={800} my="xs" c="slateClean.9">{processCount}</Text>
+                <Text size="xs" c="blue.6" fw={500}>Dalam peninjauan</Text>
+              </Paper>
+
+              <Paper
+                p="xl"
+                onClick={() => setActiveFilter('hold')}
+                style={{ cursor: 'pointer', outline: activeFilter === 'hold' ? '2px solid #f59e0b' : 'none', transition: 'all 0.2s' }}
+              >
+                <Text size="xs" fw={700} c="slateClean.4" lts="0.5px" truncate="end">TIKET DITANGGUHKAN</Text>
+                <Text size="36px" fw={800} my="xs" c="slateClean.9">{holdCount}</Text>
+                <Text size="xs" c="orange.6" fw={500}>Penangguhan aktif</Text>
+              </Paper>
+
+              <Paper
+                p="xl"
+                onClick={() => setActiveFilter('archived')}
+                style={{ cursor: 'pointer', outline: activeFilter === 'archived' ? '2px solid #10b981' : 'none', transition: 'all 0.2s' }}
+              >
+                <Text size="xs" fw={700} c="slateClean.4" lts="0.5px" truncate="end">TIKET SELESAI</Text>
+                <Text size="36px" fw={800} my="xs" c="slateClean.9">{archivedCount}</Text>
+                <Text size="xs" c="green.6" fw={500}>Telah diselesaikan</Text>
+              </Paper>
+            </SimpleGrid>
+
             <Paper p="xl">
-              <Group mb="sm" gap="xs">
-                <Text fw={800} size="xl" c="slateClean.9">Detail Pengajuan</Text>
+              <Group mb="xl" gap="sm" align="center">
+                <TextInput
+                  placeholder="Cari nomor tiket..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  leftSection={<IconSearch size={16} stroke={1.5} color="#64748b" />}
+                  w={{ base: '100%', sm: 300 }}
+                  styles={{ input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' } }}
+                />
+
+                <Select
+                  placeholder="Semua Urgensi"
+                  data={[
+                    { value: 'Tinggi', label: '🔴 Urgensi Tinggi' },
+                    { value: 'Sedang', label: '🟡 Urgensi Sedang' },
+                    { value: 'Rendah', label: '🟢 Urgensi Rendah' },
+                  ]}
+                  value={urgencyFilter}
+                  onChange={setUrgencyFilter}
+                  clearable
+                  w={{ base: '100%', sm: 200 }}
+                  styles={{ input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' } }}
+                />
+
+                {(activeFilter || urgencyFilter) && (
+                  <Button
+                    variant="light"
+                    color="gray"
+                    size="sm"
+                    radius="md"
+                    onClick={() => {
+                      setActiveFilter(null);
+                      setUrgencyFilter(null);
+                    }}
+                    leftSection={<IconX size={14} />}
+                  >
+                    Hapus Filter
+                  </Button>
+                )}
               </Group>
 
-              <form onSubmit={handleUploadAndSubmit}>
-                <Stack gap="md">
-                  <Select
-                    label="Kategori Pengajuan"
-                    placeholder="Pilih kategori yang sesuai"
-                    data={categories}
-                    searchable
-                    required
-                    value={categoryId}
-                    onChange={(value) => setCategoryId(value || '')}
-                    radius="md"
-                  />
-                  {subCategoryOptions.length > 0 && (
-                    <Select
-                      label="Sub-Kategori Tiket"
-                      placeholder="Pilih tipe permasalahan yang sesuai"
-                      required
-                      searchable
-                      value={subCategory}
-                      onChange={setSubCategory}
-                      data={subCategoryOptions}
-                      radius="md"
-                    />
+              <Table.ScrollContainer minWidth={1000}>
+              <Table verticalSpacing="md" horizontalSpacing="md" highlightOnHover variant="simple" striped>
+                <Table.Thead bg="slateClean.0">
+                  <Table.Tr>
+                    <Table.Th style={{ cursor: 'pointer' }} w={250} onClick={() => handleSortRequest('ticket')}>
+                      <Text size="xs" fw={700} c="slateClean.5">NO. TIKET{renderSortArrow('ticket')}</Text>
+                    </Table.Th>
+                    <Table.Th w={300} style={{ cursor: 'pointer' }} onClick={() => handleSortRequest('title')}>
+                      <Text size="xs" fw={700} c="slateClean.5">JUDUL / JENIS{renderSortArrow('title')}</Text>
+                    </Table.Th>
+                    <Table.Th>
+                      <Text size="xs" fw={700} c="slateClean.5">DURASI</Text>
+                    </Table.Th>
+                    <Table.Th w={230}style={{ cursor: 'pointer' }} onClick={() => handleSortRequest('date')}>
+                      <Text size="xs" fw={700} c="slateClean.5">TANGGAL KIRIM{renderSortArrow('date')}</Text>
+                    </Table.Th>
+                    <Table.Th w={280}>
+                      <Text size="xs" fw={700} c="slateClean.5">Staf</Text>
+                    </Table.Th>
+                    <Table.Th w={300} style={{ cursor: 'pointer' }} onClick={() => handleSortRequest('status')}>
+                      <Text size="xs" fw={700} c="slateClean.5">STATUS SAAT INI{renderSortArrow('status')}</Text>
+                    </Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+
+                <Table.Tbody>
+                  {filteredRequests.length === 0 ? (
+                    <Table.Tr>
+                      <Table.Td colSpan={6} ta="center" py="xl">
+                        <Stack gap="xs" align="center" py="md">
+                          <IconInfoCircle size={24} color="#94a3b8" />
+                          <Text fw={700} c="slateClean.8" size="sm">Data Tiket Tidak Ditemukan</Text>
+                          <Text size="xs" c="dimmed" w={280}>Tidak ada tiket yang sesuai dengan filter pencarian.</Text>
+                        </Stack>
+                      </Table.Td>
+                    </Table.Tr>
+                  ) : (
+                    filteredRequests.map((req) => {
+                      const finalAttachment = req.attachments?.find((att: any) => att.type === 'Dokumen_Final');
+
+                      const effectiveSlaDays = (req.categories?.id === 4 || req.categories?.name === 'Tiket Lainnya')
+                        ? (req.custom_sla_days ?? null) : 7;
+
+                      const slaMetrics = getSlaMetrics(req.created_at, req.status, req.total_hold_days, effectiveSlaDays, req.updated_at, publicHolidays);
+
+                      const getUrgencyColor = (urgency: string) => {
+                        if (urgency === 'Tinggi') return 'red';
+                        if (urgency === 'Sedang') return 'orange';
+                        return 'gray';
+                      };
+
+                      return (
+                        <Table.Tr key={req.id} style={{
+                          borderBottom: '1px solid #f1f5f9',
+                          backgroundColor: slaMetrics.isOverdue ? '#fff5f5' : 'undefined',
+                          transition: 'background-color 0.2s ease'
+                           }}>
+                          <Table.Td>
+                            <Stack gap={2} align="flex-start">
+                            <Tooltip label="Klik untuk melihat riwayat pengajuan" position="top" withArrow>
+                              <Text
+                                fw={700}
+                                size="sm"
+                                c="ptpn4Green.9"
+                                style={{ cursor: 'pointer', display: 'inline-block' }}
+                                onClick={() => handleOpenTimeline(req)}
+                              >
+                                {req.ticket_number} 📋
+                              </Text>
+                            </Tooltip>
+
+                            <Badge
+                              color={req.urgency === 'Tinggi' ? 'red' : req.urgency === 'Sedang' ? 'orange' : 'gray'}
+                              variant="filled"
+                              size="xs"
+                              styles={{ root: { textTransform: 'none', height: '17px', padding: '0 4px' } }}
+                            >
+                              {req.urgency || 'Sedang'}
+                            </Badge>
+                          </Stack>
+                          </Table.Td>
+
+                          <Table.Td>
+                            <Text size="sm" fw={500} c="slateClean.7">{req.request_title}</Text>
+                            <Text size="11px" c="dimmed">
+                              {req.categories?.name || 'Tidak Diketahui'}
+                              {req.sub_categories?.name ? ` (${req.sub_categories.name}) ` : ' '}
+                              | Batas: {effectiveSlaDays !== null ? `${effectiveSlaDays} Hari` : 'Belum Ditentukan'}
+                            </Text>
+                          </Table.Td>
+
+                          <Table.Td>
+                            <Stack gap={2}>
+                              <Text size="sm" fw={700} c="slateClean.9">
+                                {slaMetrics.displayString}
+                              </Text>
+                              {slaMetrics.finalHoldDays > 0 && (
+                                <Text size="11px" color="orange.7" fw={600}>Total Hold: {slaMetrics.finalHoldDays} Hari</Text>
+                              )}
+                            </Stack>
+                          </Table.Td>
+
+                          <Table.Td>
+                            <Text size="sm" c="slateClean.7">
+                              {new Date(req.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </Text>
+                          </Table.Td>
+
+                          <Table.Td>
+                            {req.pic?.full_name ? (
+                              <Group gap="xs" wrap="nowrap">
+                                <Avatar size="24px" radius="xl" color="ptpn4Green.9" bg="ptpn4Green.0">
+                                  {req.pic.full_name.slice(0, 2).toUpperCase()}
+                                </Avatar>
+                                <Text size="sm" fw={600} c="slateClean.8">
+                                  {req.pic.full_name}
+                                </Text>
+                              </Group>
+                            ) : (
+                              <Badge color="gray.4" variant="outline" radius="sm" c="dimmed" style={{ borderStyle: 'dashed', textTransform: 'none' }}>
+                                Belum Diproses Staf
+                              </Badge>
+                            )}
+                          </Table.Td>
+
+                          <Table.Td>
+                            <Group gap="md">
+                              <Badge color={getStatusColor(req.status)} variant="light" radius="sm" py="md">
+                                {req.status}
+                              </Badge>
+
+                              {finalAttachment && (
+                                <Button
+                                  onClick={() => handleDownloadSecureFile(supabase, finalAttachment.file_url, finalAttachment.file_name)}
+                                  size="xs"
+                                  color="green"
+                                  variant="filled"
+                                  w={150}
+                                  h={35}
+                                  leftSection={<IconDownload size={12} />}
+                                >
+                                  Unduh Hasil Akhir
+                                </Button>
+                              )}
+                            </Group>
+                          </Table.Td>
+                        </Table.Tr>
+                      );
+                    })
                   )}
-                  <TextInput
-                    label="Judul Pengajuan"
-                    placeholder="Contoh: Pengajuan Akses Akun SAP"
-                    required
-                    value={requestTitle}
-                    onChange={(e) => setRequestTitle(e.target.value)}
-                    radius="md"
-                  />
-                  <Select
-                    label="Tingkat Urgensi"
-                    placeholder="Pilih tingkat urgensi dokumen"
-                    data={[
-                      { value: 'Rendah', label: '🟢 Rendah (Biasa)' },
-                      { value: 'Sedang', label: '🟡 Sedang (Butuh Perhatian)' },
-                      { value: 'Tinggi', label: '🔴 Tinggi (Prioritas Utama)' },
-                    ]}
-                    required
-                    value={urgency}
-                    onChange={setUrgency}
-                    radius="md"
-                  />
-                  <Textarea
-                    label="Deskripsi Pengajuan"
-                    placeholder="Berikan deskripsi secara singkat dan jelas"
-                    rows={5}
-                    value={description}
-                    required
-                    onChange={(e) => setDescription(e.target.value)}
-                    radius="md"
-                  />
-                  <FileInput
-                    label="Unggah Dokumen Pengajuan (.PDF)"
-                    placeholder={isTiketCategory ? "Opsional (dalam format .PDF)" : "Pilih dokumen dari perangkat Anda"}
-                    required={!isTiketCategory}
-                    withAsterisk={!isTiketCategory}
-                    value={files}
-                    onChange={setFiles}
-                    accept="application/pdf"
-                    multiple
-                    radius="md"
-                  />
-                  <Button type="submit" loading={formLoading} color="ptpn4Green.9" fullWidth mt="lg" size="md" radius="md">
-                    Kirim Pengajuan
-                  </Button>
-                </Stack>
-              </form>
+                </Table.Tbody>
+              </Table>
+              </Table.ScrollContainer>
             </Paper>
           </Box>
 
+        <UserDetailDrawer
+          request={selectedRequest}
+          historyLogs={historyLogs}
+          loadingTimeline={loadingTimeline}
+          onClose={() => setSelectedRequest(null)}
+          onDownload={(url, name) => handleDownloadSecureFile(supabase, url, name)}
+        />
     </Box>
   );
 }

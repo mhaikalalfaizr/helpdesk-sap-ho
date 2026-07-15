@@ -6,7 +6,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 export async function POST(request: Request) {
   try {
     const authHeader = request.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.NEXT_PUBLIC_INTERNAL_API_KEY}`) {
+    if (authHeader !== `Bearer ${process.env.INTERNAL_API_KEY}`) {
       return NextResponse.json({ error: 'Akses Ditolak' }, { status: 401 });
     }
 
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-
+   
     const emailHtml = `
       <div style="font-family: sans-serif; padding: 20px; color: #334155; max-width: 600px; border: 1px solid #e2e8f0; border-radius: 8px;">
         <h2 style="color: #0e422a;">Helpdesk SAP HO Notification</h2>

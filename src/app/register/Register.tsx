@@ -11,7 +11,7 @@ import {
 import { IconMail, IconLock, IconChecklist, IconAlertCircle, IconUser, IconBriefcase } from '@tabler/icons-react';
 
 export default function RegisterPage() {
-  const router = useRouter();
+  const router = useRouter(); 
   const supabase = createClient();
 
   const [email, setEmail] = useState('');

@@ -1,9 +1,12 @@
   'use client';
-
+  
   import { useState, useEffect } from 'react';
   import { useRouter } from 'next/navigation';
-  import { supabase } from '../../../lib/supabase';
+  import { useMemo } from 'react';
+  import { createClient } from '@/lib/supabase/client';
   import { notifications } from '@mantine/notifications';
+  import RejectModal from '../../../components/rejectModal';
+  import DetailDrawer from '../../../components/detailDrawer';
   import {
     AppShell, SimpleGrid, Paper, Text, Group, Badge, Avatar, Table, Menu, ActionIcon, TextInput, NumberInput,
     NavLink, Stack, Box, Kbd, Tooltip, Modal, Timeline, FileInput, Textarea, Button, Drawer, Divider, Select
@@ -11,10 +14,10 @@
   import {
     IconLayoutDashboard, IconFileText, IconClock, IconChecklist, IconSettings, IconLogout, IconSearch, IconBell, IconPencil,
     IconMail, IconDotsVertical, IconCheck, IconX, IconAlertCircle, IconArrowUpRight, IconDownload, IconEye, IconUserShare,
-    IconPlayerPause, IconPlayerPlay, IconArrowRight, IconFileCheck
+    IconPlayerPause, IconPlayerPlay, IconArrowRight, IconFileCheck, IconPresentationAnalytics
   } from '@tabler/icons-react';
 
-  import { getSlaMetrics, countWorkingDays } from '../../../utils/helpers';
+  import { getSlaMetrics, countWorkingDays, handleDownloadSecureFile } from '../../../utils/helpers';
 
   interface RequestItem {
     id: string;
@@ -47,6 +50,7 @@
 
   export default function PicDashboard() {
     const router = useRouter();
+    const supabase = createClient();
 
     const [currentPicId, setCurrentPicId] = useState<string | null>(null);
     const [currentUserName, setCurrentUserName] = useState('Staf');
@@ -176,54 +180,6 @@
       setLoading(false);
     };
 
-  const handleDownloadSecureFile = async (rawUrl: string, providedFileName?: string) => {
-    try {
-      const pathSegments = rawUrl.split('/documents/');
-      if (pathSegments.length < 2) throw new Error("Format URL tidak valid");
-
-      const filePath = pathSegments[1];
-
-      const { data, error } = await supabase.storage.from('documents').createSignedUrl(filePath, 60);
-
-      if (error) throw error;
-
-      if (data?.signedUrl) {
-        const response = await fetch(data.signedUrl);
-        if (!response.ok) throw new Error('Server gagal merespons file.');
-
-        const blob = await response.blob();
-        const objectUrl = window.URL.createObjectURL(blob);
-
-        const link = document.createElement('a');
-        link.href = objectUrl;
-
-        let finalName = providedFileName;
-
-        if (!finalName || finalName === 'undefined') {
-          const urlParts = rawUrl.split('/');
-          finalName = urlParts[urlParts.length - 1] || 'Dokumen_Unduhan.pdf';
-        }
-
-        link.download = finalName;
-
-        document.body.appendChild(link);
-        link.click();
-
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(objectUrl);
-      }
-    } catch (err: any) {
-      notifications.show({ title: 'Akses Ditolak', message: 'Gagal mengunduh dokumen: ' + err.message, color: 'red' });
-    }
-  };
-
-    const getProjectedDate = (daysToAdd: number) => {
-      if (!daysToAdd) return '-';
-      const projected = new Date();
-      projected.setDate(projected.getDate() + daysToAdd);
-      return projected.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-    };
-
     const handleOpenTimeline = async (req: RequestItem) => {
       setSelectedRequest(req);
       setLoadingTimeline(true);
@@ -313,7 +269,6 @@
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${process.env.NEXT_PUBLIC_INTERNAL_API_KEY}`
                 },
                 body: JSON.stringify({
                   ticketNumber: assignRequest.ticket_number,
@@ -377,7 +332,6 @@
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.NEXT_PUBLIC_INTERNAL_API_KEY}`
               },
               body: JSON.stringify({
                 ticketNumber: targetRequest.ticket_number,
@@ -585,7 +539,6 @@
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.NEXT_PUBLIC_INTERNAL_API_KEY}`
               },
               body: JSON.stringify({
                 ticketNumber: req.ticket_number,
@@ -716,7 +669,7 @@
     const holdCount = requests.filter(r => r.status.startsWith('Sedang Ditangguhkan')).length;
     const archivedCount = requests.filter(r => r.status === 'Disetujui' || r.status === 'Ditolak').length;
 
-    const getFilteredAndSortedRequests = () => {
+    const filteredRequests = useMemo(() => {
       let filtered = [...requests];
 
       if (activeFilter === 'unassigned') {
@@ -757,7 +710,7 @@
         if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
         return 0;
       });
-    };
+    }, [requests, activeFilter, searchQuery, urgencyFilter, sortKey, sortDirection]);
 
     const handleSortRequest = (key: string) => {
       if (sortKey === key) {
@@ -775,70 +728,8 @@
       return <Text component="span" size="xs" c="ptpn4Green.9" ml={5}> ▼</Text>;
     };
 
-    const handleLogout = async () => {
-      await supabase.auth.signOut();
-      router.replace('/login');
-    };
-
     return (
-      <AppShell
-        header={{ height: 75 }}
-        navbar={{ width: 280, breakpoint: 'sm' }}
-        padding="xl"
-      >
-
-        <AppShell.Header bg="white" px="xl" style={{ borderBottom: '1px solid rgba(226, 232, 240, 0.8)' }}>
-          <Group justify="space-between" h="100%">
-            <Group gap="lg" h="100%">
-              <Avatar src={null} alt="Staf Monitor" color="ptpn4Green.9" radius="xl">Staf
-              </Avatar>
-                <Box>
-                  <Text size="sm" fw={600} c="slateClean.9">Halo, {currentUserName}</Text>
-                  <Text size="xs" c="dimmed">Selamat datang di {process.env.NEXT_PUBLIC_APP_NAME}</Text>
-                </Box>
-            </Group>
-
-            <Group gap="lg" h="100%">
-              <ActionIcon variant="subtle" color="gray" radius="xl" size="lg" style={{ position: 'relative' }}>
-                <IconBell size={20} stroke={1.5} />
-                {holdCount > 0 && (
-                  <Box style={{ position: 'absolute', top: 6, right: 6, width: 8, height: 8, backgroundColor: '#f59e0b', borderRadius: '50%' }} />
-                )}
-              </ActionIcon>
-            </Group>
-          </Group>
-        </AppShell.Header>
-
-        <AppShell.Navbar p="md" bg="white" style={{ borderRight: 'none' }}>
-          <Stack justify="between" h="100%">
-            <Box>
-              <Group px="sm" py="md" mb="xl">
-                <Box bg="ptpn4Green.0" p="xs" style={{ borderRadius: '12px', display: 'flex', alignItems: 'center' }}>
-                  <IconChecklist size={24} color="#0e422a" />
-                </Box>
-                <Text fw={800} size="xl" lts="tight" c="ptpn4Green.9">{process.env.NEXT_PUBLIC_APP_NAME}</Text>
-              </Group>
-
-              <Stack gap={4}>
-                <Text size="xs" fw={700} c="slateClean.4" px="sm" mb={4} lts="0.5px">MENU</Text>
-                <NavLink
-                  label="Overview"
-                  leftSection={<IconLayoutDashboard size={18} stroke={1.5} />}
-                  active={activeMenu === 0}
-                  onClick={() => setActiveMenu(0)}
-                  py="sm"
-                />
-
-                <Text size="xs" fw={700} c="slateClean.4" px="sm" mt="xl" mb={4} lts="0.5px">SISTEM</Text>
-                <NavLink label="Konfigurasi SLA" leftSection={<IconSettings size={18} stroke={1.5} />} py="sm" />
-                <NavLink label="Keluar Aplikasi" leftSection={<IconLogout size={18} stroke={1.5} />} color="dimmed" py="sm" onClick={handleLogout} />
-              </Stack>
-            </Box>
-
-          </Stack>
-        </AppShell.Navbar>
-
-        <AppShell.Main>
+      <>
           <Box mb="xl">
             <Stack gap="sm">
               <Text size="28px" fw={800} c="slateClean.9" style={{ letterSpacing: '-0.5px' }}>Daftar Tiket</Text>
@@ -862,7 +753,7 @@
                 TOTAL TIKET MASUK
               </Text>
               <Text size="36px" fw={800} my="xs">{loading ? '...' : totalCount}</Text>
-              <Text size="xs" c={activeFilter === null ? 'ptpn4Green.1' : 'dimmed'} fw={500}>Semua pengajuan</Text>
+              <Text size="xs" c={activeFilter === null ? 'ptpn4Green.1' : 'dimmed'} fw={500}>Keseluruhan pengajuan</Text>
             </Paper>
 
             <Paper
@@ -992,7 +883,7 @@
                 </Table.Thead>
                 <Table.Tbody>
 
-                {getFilteredAndSortedRequests().length === 0 ? (
+                {filteredRequests.length === 0 ? (
                     <Table.Tr>
                       <Table.Td colSpan={7} ta="center" py="xl" style={{ backgroundColor: '#ffffff' }}>
                         <Stack gap="xs" align="center" py="md">
@@ -1008,7 +899,7 @@
                     </Table.Tr>
                   ) : (
 
-                  getFilteredAndSortedRequests().map((req) => {
+                  filteredRequests.map((req) => {
                     const isFinal = req.status === 'Disetujui' || req.status === 'Ditolak' || req.status === 'Selesai (Rilis PRD)';
                       const isHoldState = req.status.startsWith('Sedang Ditangguhkan di');
                       const canHold = req.status.includes('Staf') || req.status.includes('Head Office') || req.status.includes('Holding') || req.status.startsWith('Dalam Proses oleh');
@@ -1218,36 +1109,18 @@
             </form>
           </Modal>
 
-          <Modal
+          <RejectModal
             opened={rejectRequest !== null}
-            onClose={() => { setRejectRequest(null); setRejectReason(''); }}
-            title={<Text fw={700}>Konfirmasi Penolakan Dokumen</Text>}
-            centered
-            radius="lg"
-          >
-            <form onSubmit={handleRejectSubmit}>
-              <Stack gap="md">
-                <Text size="sm" c="slateClean.7">
-                  Anda akan menolak permanen dokumen <b style={{ color: '#e53e3e' }}>{rejectRequest?.ticket_number}</b>. Tindakan ini tidak dapat dibatalkan.
-                </Text>
-
-                <Textarea
-                  label="Alasan/Keterangan Penolakan"
-                  placeholder="Berikan keterangan yang jelas (misal: Format dokumen awal tidak valid...)"
-                  required
-                  rows={4}
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  radius="md"
-                />
-
-                <Group justify="flex-end" mt="md">
-                  <Button variant="default" onClick={() => setRejectRequest(null)} radius="md">Batal</Button>
-                  <Button type="submit" color="red.8" loading={rejecting} radius="md">Tolak</Button>
-                </Group>
-              </Stack>
-            </form>
-          </Modal>
+            onClose={() => { 
+              setRejectRequest(null); 
+              setRejectReason(''); 
+            }}
+            ticketNumber={rejectRequest?.ticket_number}
+            rejectReason={rejectReason}
+            onReasonChange={setRejectReason}
+            onSubmit={handleRejectSubmit}
+            isRejecting={rejecting}
+          />
 
           <Modal
             opened={confirmNextRequest !== null}
@@ -1270,40 +1143,6 @@
                       const tempReq = confirmNextRequest;
                       setConfirmNextRequest(null);
                       await handleNextStep(tempReq);
-                    }
-                  }}
-                >
-                  Konfirmasi
-                </Button>
-              </Group>
-            </Stack>
-          </Modal>
-
-          <Modal
-            opened={confirmHoldRequest !== null}
-            onClose={() => setConfirmHoldRequest(null)}
-            title={<Text fw={700} size="md">Konfirmasi Penangguhan</Text>}
-            centered
-            radius="lg"
-          >
-            <Stack gap="md">
-              <Text size="sm" c="slateClean.7">
-                {confirmHoldRequest?.status.startsWith('Sedang Ditangguhkan') ? (
-                  <>Anda akan melepas status penangguhan pada tiket <b>{confirmHoldRequest?.ticket_number}</b>. Riwayat log penangguhan akan dicatat.</>
-                ) : (
-                  <>Anda akan menangguhkan sementara tiket <b>{confirmHoldRequest?.ticket_number}</b>. Riwayat log penangguhan akan dicatat.</>
-                )}
-              </Text>
-              <Group justify="flex-end" mt="md">
-                <Button variant="default" onClick={() => setConfirmHoldRequest(null)} radius="md">Batal</Button>
-                <Button
-                  color="orange.8"
-                  radius="md"
-                  onClick={async () => {
-                    if (confirmHoldRequest) {
-                      const tempReq = confirmHoldRequest;
-                      setConfirmHoldRequest(null);
-                      await handleToggleHold(tempReq);
                     }
                   }}
                 >
@@ -1400,200 +1239,25 @@
           </Stack>
         </Modal>
 
-        <Drawer
-          opened={selectedDetail !== null}
+        <DetailDrawer
+          detail={selectedDetail}
+          historyLogs={historyLogs}
+          loadingTimeline={loadingTimeline}
           onClose={() => setSelectedDetail(null)}
-          title={
-            <Group gap="xs">
-              <Badge color="ptpn4Green.9" variant="filled" radius="sm">
-                {selectedDetail?.ticket_number}
-              </Badge>
-              <Text fw={800} size="md" c="slateClean.9">Detail Dokumen Pengajuan</Text>
-            </Group>
-          }
-          position="right"
-          size="md"
-          styles={{
-            header: { borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' },
-            content: { backgroundColor: '#ffffff' }
+          editingSlaId={editingSlaId}
+          newSlaValue={newSlaValue}
+          isSavingSla={isSavingSla}
+          onEditSla={(id, currentVal) => {
+            setEditingSlaId(id);
+            setNewSlaValue(currentVal);
           }}
-        >
-          {selectedDetail && (
-            <Stack gap="lg" mt="md">
-              {}
-              <Box p="sm" bg="slateClean.0" style={{ borderRadius: '8px' }}>
-                <Text size="xs" c="dimmed" fw={600} mb={4}>INFORMASI PENGAJU</Text>
-                <Text fw={700} size="sm" c="slateClean.8">{selectedDetail.profiles?.full_name}</Text>
-                <Text size="xs" c="slateClean.5">
-                  {selectedDetail.profiles?.unit_kerja === 'Head Office'
-                    ? `${selectedDetail.profiles.unit_kerja} | ${selectedDetail.profiles.division || ''}`
-                    : (selectedDetail.profiles?.unit_kerja || 'Lokasi Kerja')}
-                  {selectedDetail.profiles?.email ? ` • ${selectedDetail.profiles.email}` : ''}
-                </Text>
-              </Box>
-
-              {}
-              <Box>
-                <Text size="xs" c="dimmed" fw={600} mb={2}>JUDUL PENGAJUAN</Text>
-                <Text fw={700} size="md" c="slateClean.9" mb="xs">{selectedDetail.request_title}</Text>
-                <Badge color="blue" variant="light">
-                  {selectedDetail.categories?.name === 'Tiket Lainnya' && selectedDetail.sub_categories?.name
-                  ? selectedDetail.sub_categories.name
-                  : (selectedDetail.categories?.name || 'Tidak Diketahui')}
-                </Badge>
-              </Box>
-
-              <Box>
-                <Text size="xs" c="dimmed" fw={600} mb={4}>TARGET BATAS WAKTU (SLA)</Text>
-
-                {editingSlaId === selectedDetail.id ? (
-                  <Group gap="xs">
-                    <NumberInput
-                      value={newSlaValue}
-                      onChange={(val) => setNewSlaValue(val as number | '')}
-                      min={1}
-                      max={365}
-                      size="xs"
-                      w={100}
-                      placeholder="Hari"
-                    />
-
-                    {newSlaValue !== '' && (
-                      <Text size="xs" c="dimmed" mt={4}>
-                        📅 Estimasi: <Text span fw={700} c="ptpn4Green.9">{getProjectedDate(Number(newSlaValue))}</Text>
-                      </Text>
-                    )}
-
-                    <Button size="xs" color="ptpn4Green.9" loading={isSavingSla} onClick={() => handleUpdateSla(selectedDetail.id)}>
-                      Simpan
-                    </Button>
-                    <Button size="xs" variant="subtle" color="gray" onClick={() => setEditingSlaId(null)}>
-                      Batal
-                    </Button>
-                  </Group>
-                ) : (
-                  <Group gap="xs">
-                    <Text size="sm" fw={600} c="slateClean.8">
-                      {selectedDetail.categories?.id === 4 || selectedDetail.categories?.name === 'Tiket Lainnya'
-                         ? (selectedDetail.custom_sla_days ? `${selectedDetail.custom_sla_days} Hari` : 'Belum Ditentukan')
-                         : `${selectedDetail.categories?.sla_days} Hari`
-                      }
-                    </Text>
-
-                    {(selectedDetail.categories?.id === 4 || selectedDetail.categories?.name === 'Tiket Lainnya') &&
-                     (currentUserRole === 'Koordinator' || selectedDetail.current_pic_id === currentPicId) && (
-                      <Tooltip label="Ubah batas waktu SLA" position="top">
-                        <ActionIcon size="sm" variant="subtle" color="blue" onClick={() => {
-                          setEditingSlaId(selectedDetail.id);
-                          setNewSlaValue(selectedDetail.custom_sla_days || '');
-                        }}>
-                          <IconPencil size={14} />
-                        </ActionIcon>
-                      </Tooltip>
-                    )}
-                  </Group>
-                )}
-              </Box>
-
-              {}
-              <Box>
-                <Text size="xs" c="dimmed" fw={600} mb={4}>DESKRIPSI & KETERANGAN DOKUMEN</Text>
-                <Paper p="md" withBorder radius="md" bg="#f8fafc" style={{ borderColor: '#e2e8f0' }}>
-                  <Text size="sm" c="slateClean.7" style={{ whiteSpace: 'pre-line', lineHeight: '1.6' }}>
-                    {selectedDetail.description || 'Pengaju tidak menyertakan keterangan tertulis pada dokumen ini.'}
-                  </Text>
-                </Paper>
-              </Box>
-
-              {}
-              {selectedDetail.attachments && selectedDetail.attachments.filter((a: any) => a.type === 'Dokumen_Awal').length > 0 ? (
-                <Box>
-                  <Text size="xs" c="dimmed" fw={600} mb={4}>
-                    DOKUMEN LAMPIRAN AWAL ({selectedDetail.attachments.filter((a: any) => a.type === 'Dokumen_Awal').length} Dokumen)
-                  </Text>
-                  <Stack gap="xs">
-                    {selectedDetail.attachments
-                      .filter((att: any) => att.type === 'Dokumen_Awal')
-                      .map((file: any, idx: number) => (
-                        <Button
-                          key={file.id || idx}
-                          onClick={() => handleDownloadSecureFile(file.file_url, file.file_name)}
-                          variant="outline"
-                          color="ptpn4Green.9"
-                          fullWidth
-                          leftSection={<IconDownload size={16} />}
-                          styles={{ inner: { justifyContent: 'flex-start' } }}
-                        >
-                          <Text size="xs" truncate style={{ maxWidth: '90%' }}>
-                            {file.file_name || `Unduh Dokumen Lampiran ${idx + 1}`}
-                          </Text>
-                        </Button>
-                      ))}
-                  </Stack>
-                </Box>
-              ) : (
-
-                selectedDetail.file_url && (
-                  <Box>
-                    <Text size="xs" c="dimmed" fw={600} mb={4}>BERKAS LAMPIRAN AWAL</Text>
-                    <Button
-                      component="a"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      variant="outline"
-                      color="ptpn4Green.9"
-                      fullWidth
-                      leftSection={<IconDownload size={16} />}
-                    >
-                      Buka Dokumen PDF
-                    </Button>
-                  </Box>
-                )
-              )}
-
-              {}
-              <Divider my="sm" label={<Text size="10px" fw={700} c="slateClean.4" lts="0.5px">RIWAYAT ALUR DOKUMEN</Text>} labelPosition="center" />
-
-              {loadingTimeline ? (
-                <Text size="xs" ta="center" c="dimmed" py="sm">Membaca jejak log birokrasi...</Text>
-              ) : (
-                <Timeline active={historyLogs.length - 1} bulletSize={18} lineWidth={1.5} color="ptpn4Green.9">
-                  {historyLogs.map((log, index) => {
-                    const isCurrentStatus = index === historyLogs.length - 1;
-
-                    return (
-                      <Timeline.Item
-                        key={log.id}
-                        title={
-                          <Text
-                            fw={700}
-                            size="xs"
-                            c={isCurrentStatus ? 'ptpn4Green.9' : 'slateClean.8'}
-                            style={{
-                              backgroundColor: isCurrentStatus ? '#ecfdf3' : 'transparent',
-                              padding: isCurrentStatus ? '2px 6px' : '0',
-                              borderRadius: isCurrentStatus ? '4px' : '0',
-                              display: 'inline-block'
-                            }}
-                          >
-                            {log.status_after}
-                          </Text>
-                        }
-                      >
-                        {log.notes && <Text size="11px" mt={2} c="slateClean.6" style={{ fontStyle: 'italic' }}>Keterangan: "{log.notes}"</Text>}
-                        <Text size="9px" c={isCurrentStatus ? 'green.7' : 'ptpn4Green.8'} fw={600} mt={4}>
-                          Oleh: {log.profiles?.full_name || 'System Auto'} • {new Date(log.created_at).toLocaleString('id-ID')}
-                        </Text>
-                      </Timeline.Item>
-                    );
-                  })}
-                </Timeline>
-              )}
-            </Stack>
-          )}
-        </Drawer>
-
-        </AppShell.Main>
-      </AppShell>
+          onCancelEditSla={() => setEditingSlaId(null)}
+          onSlaValueChange={(val) => setNewSlaValue(val)}
+          onSaveSla={handleUpdateSla}
+          currentUserRole={currentUserRole}
+          currentPicId={currentPicId}
+          onDownload={(url, name) => handleDownloadSecureFile(supabase, url, name)}
+        />
+      </>
     );
   }

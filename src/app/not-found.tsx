@@ -1,10 +1,12 @@
 'use client';
 
+import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { Container, Title, Text, Button, Group, Stack, Box } from '@mantine/core';
 import { IconAlertCircle, IconHome } from '@tabler/icons-react';
 
 export default function NotFoundPage() {
+  const supabase = createClient();
 
   return (
     <Box
