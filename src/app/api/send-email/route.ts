@@ -1,24 +1,41 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.INTERNAL_API_KEY}`) {
-      return NextResponse.json({ error: 'Akses Ditolak' }, { status: 401 });
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() { return cookieStore.getAll(); },
+          setAll(cookiesToSet) {
+            try { cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options)); } catch (error) {}
+          },
+        },
+      }
+    );
+
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: 'Akses Ditolak: Sesi tidak valid' }, { status: 401 });
     }
 
     const { ticketNumber, title, status, notes, recipientEmail, recipientName } = await request.json();
 
     if (!recipientEmail || !ticketNumber || !title || !status || !recipientName) {
       return NextResponse.json(
-        { error: 'Data tidak lengkap. Pastikan email, nama, nomor tiket, judul, dan status terisi.' }, 
+        { error: 'Data tidak lengkap. Pastikan email, nama, nomor tiket, judul, dan status terisi.' },
         { status: 400 }
       );
     }
-   
+
     const emailHtml = `
       <div style="font-family: sans-serif; padding: 20px; color: #334155; max-width: 600px; border: 1px solid #e2e8f0; border-radius: 8px;">
         <h2 style="color: #0e422a;">Helpdesk SAP HO Notification</h2>
@@ -58,13 +75,9 @@ export async function POST(request: Request) {
       html: emailHtml,
     });
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-
+    if (error) throw error;
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Terjadi kesalahan sistem, harap hubungi administrator.' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Terjadi kesalahan sistem' }, { status: 500 });
   }
 }
-

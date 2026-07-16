@@ -1,5 +1,5 @@
   'use client';
-  
+
   import { useState, useEffect } from 'react';
   import { useRouter } from 'next/navigation';
   import { useMemo } from 'react';
@@ -669,6 +669,18 @@
     const holdCount = requests.filter(r => r.status.startsWith('Sedang Ditangguhkan')).length;
     const archivedCount = requests.filter(r => r.status === 'Disetujui' || r.status === 'Ditolak').length;
 
+    const overdueCount = useMemo(() => {
+      return requests.filter(req => {
+        const isFinal = req.status === 'Disetujui' || req.status === 'Ditolak' || req.status === 'Selesai (Rilis PRD)';
+        if (isFinal) return false;
+
+        const effectiveSlaDays = (req.categories?.id === 4 || req.categories?.name === 'Tiket Lainnya')
+          ? (req.custom_sla_days ?? null) : 7;
+        const metrics = getSlaMetrics(req.created_at, req.status, req.total_hold_days, effectiveSlaDays, req.updated_at, publicHolidays);
+        return metrics.isOverdue;
+      }).length;
+    }, [requests, publicHolidays]);
+
     const filteredRequests = useMemo(() => {
       let filtered = [...requests];
 
@@ -680,6 +692,16 @@
         filtered = filtered.filter(r => r.status.startsWith('Sedang Ditangguhkan'));
       } else if (activeFilter === 'archived') {
         filtered = filtered.filter(r => r.status === 'Disetujui' || r.status === 'Ditolak');
+      } else if (activeFilter === 'overdue') {
+        filtered = filtered.filter(req => {
+          const isFinal = req.status === 'Disetujui' || req.status === 'Ditolak' || req.status === 'Selesai (Rilis PRD)';
+          if (isFinal) return false;
+
+          const effectiveSlaDays = (req.categories?.id === 4 || req.categories?.name === 'Tiket Lainnya')
+            ? (req.custom_sla_days ?? null) : 7;
+          const metrics = getSlaMetrics(req.created_at, req.status, req.total_hold_days, effectiveSlaDays, req.updated_at, publicHolidays);
+          return metrics.isOverdue;
+        });
       }
 
       if (searchQuery.trim() !== '') {
@@ -737,7 +759,7 @@
             </Stack>
           </Box>
 
-          <SimpleGrid cols={{ base: 1, sm: 2, lg: 5 }} spacing="lg" mb="xl">
+          <SimpleGrid cols={{ base: 1, sm: 2, lg: 6 }} spacing="lg" mb="xl">
             <Paper
               bg={activeFilter === null ? 'ptpn4Green.9' : 'slateClean.1'}
               p="xl"
@@ -782,6 +804,18 @@
               </Text>
               <Text size="36px" fw={800} my="xs" c="slateClean.9">{loading ? '...' : processCount}</Text>
               <Text size="xs" c="blue.6" fw={500}>Sedang ditinjau</Text>
+            </Paper>
+
+            <Paper
+              p="xl"
+              onClick={() => setActiveFilter('overdue')}
+              style={{ cursor: 'pointer', outline: activeFilter === 'overdue' ? '2px solid #dc2626' : 'none', transition: 'all 0.2s', backgroundColor: overdueCount > 0 ? '#ffffff' : '#ffffff' }}
+            >
+              <Text size="xs" fw={700} c="slateClean.4" lts="0.5px" truncate="end">
+                LEWAT BATAS WAKTU
+              </Text>
+              <Text size="36px" fw={800} my="xs" c="red.6">{loading ? '...' : overdueCount}</Text>
+              <Text size="xs" c="red.6" fw={500}>Melewati batas waktu</Text>
             </Paper>
 
             <Paper
@@ -1111,9 +1145,9 @@
 
           <RejectModal
             opened={rejectRequest !== null}
-            onClose={() => { 
-              setRejectRequest(null); 
-              setRejectReason(''); 
+            onClose={() => {
+              setRejectRequest(null);
+              setRejectReason('');
             }}
             ticketNumber={rejectRequest?.ticket_number}
             rejectReason={rejectReason}

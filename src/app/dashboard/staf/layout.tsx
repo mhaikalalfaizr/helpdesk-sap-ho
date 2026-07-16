@@ -82,9 +82,6 @@ return(
 
                   <Text size="xs" fw={700} c="slateClean.4" px="sm" mt="xl" mb={4} lts="0.5px">SISTEM</Text>
                   <NavLink
-                    label="Konfigurasi SLA" leftSection={<IconSettings size={18} stroke={1.5} />} py="sm"
-                    />
-                  <NavLink
                     label="Keluar Aplikasi" leftSection={<IconLogout size={18} stroke={1.5} />} color="dimmed" py="sm" onClick={handleLogout}
                     />
                 </Stack>

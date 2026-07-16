@@ -1,5 +1,4 @@
 import { notifications } from "@mantine/notifications";
-import { supabase } from '@/lib/supabase';
 
 export const countWorkingDays = (startDate: number, endDate: number, publicHolidays: string[]) => {
   let count = 0;

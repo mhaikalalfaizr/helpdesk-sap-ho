@@ -132,7 +132,7 @@ export default function DetailDrawer({
           {detail.attachments && detail.attachments.filter((a: any) => a.type === 'Dokumen_Awal').length > 0 ? (
             <Box>
               <Text size="xs" c="dimmed" fw={600} mb={4}>
-                DOKUMEN LAMPIRAN AWAL ({detail.attachments.filter((a: any) => a.type === 'Dokumen_Awal').length} Dokumen)
+                LAMPIRAN DOKUMEN AWAL ({detail.attachments.filter((a: any) => a.type === 'Dokumen_Awal').length} Dokumen)
               </Text>
               <Stack gap="xs">
                 {detail.attachments.filter((att: any) => att.type === 'Dokumen_Awal').map((file: any, idx: number) => (
@@ -152,7 +152,7 @@ export default function DetailDrawer({
           ) : (
             detail.file_url && (
               <Box>
-                <Text size="xs" c="dimmed" fw={600} mb={4}>BERKAS LAMPIRAN AWAL</Text>
+                <Text size="xs" c="dimmed" fw={600} mb={4}></Text>
                 <Button
                   component="a" target="_blank" rel="noopener noreferrer"
                   variant="outline" color="ptpn4Green.9" fullWidth leftSection={<IconDownload size={16} />}
@@ -163,10 +163,32 @@ export default function DetailDrawer({
             )
           )}
 
+          {detail.attachments?.some((a: any) => a.type === 'Dokumen_Final') && (
+            <Box mt="sm">
+              <Text size="xs" c="ptpn4Green.9" fw={800} mb={4}>LAMPIRAN DOKUMEN AKHIR</Text>
+              <Stack gap="xs">
+                {detail.attachments
+                  .filter((att: any) => att.type === 'Dokumen_Final')
+                  .map((file: any, idx: number) => (
+                    <Button
+                      key={file.id || idx}
+                      onClick={() => onDownload(file.file_url, file.file_name)}
+                      variant="filled" color="ptpn4Green.9" fullWidth leftSection={<IconDownload size={16} />}
+                      styles={{ inner: { justifyContent: 'flex-start' } }}
+                    >
+                      <Text size="xs" truncate style={{ maxWidth: '90%' }}>
+                        {file.file_name || `Unduh Dokumen Final ${idx + 1}`}
+                      </Text>
+                    </Button>
+                  ))}
+              </Stack>
+            </Box>
+          )}
+
           {}
           <Divider my="sm" label={<Text size="10px" fw={700} c="slateClean.4" lts="0.5px">RIWAYAT ALUR DOKUMEN</Text>} labelPosition="center" />
           {loadingTimeline ? (
-            <Text size="xs" ta="center" c="dimmed" py="sm">Membaca jejak log birokrasi...</Text>
+            <Text size="xs" ta="center" c="dimmed" py="sm">Memuat riwayat log...</Text>
           ) : (
             <Timeline active={historyLogs.length - 1} bulletSize={18} lineWidth={1.5} color="ptpn4Green.9">
               {historyLogs.map((log, index) => {
