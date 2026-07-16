@@ -9,9 +9,7 @@ export async function proxy(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
+        getAll() { return request.cookies.getAll(); },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value));
           supabaseResponse = NextResponse.next({ request });
@@ -24,16 +22,39 @@ export async function proxy(request: NextRequest) {
   );
 
   const { data: { user } } = await supabase.auth.getUser();
+  const path = request.nextUrl.pathname;
 
-  const isDashboardRoute = request.nextUrl.pathname.startsWith('/dashboard');
-  const isAuthRoute = request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/';
+  const isDashboardRoute = path.startsWith('/dashboard');
+  const isAuthRoute = path === '/login' || path === '/register' || path === '/';
 
   if (isDashboardRoute && !user) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  if (isAuthRoute && user) {
-    return NextResponse.redirect(new URL('/dashboard/pengajuan', request.url));
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    const role = profile?.role;
+
+    if (isAuthRoute) {
+      if (role === 'Staf' || role === 'Koordinator') {
+        return NextResponse.redirect(new URL('/dashboard/staf', request.url));
+      } else {
+        return NextResponse.redirect(new URL('/dashboard/pengajuan', request.url));
+      }
+    }
+
+    if (path.startsWith('/dashboard/staf') && role === 'Pengaju') {
+      return NextResponse.redirect(new URL('/dashboard/pengajuan', request.url));
+    }
+
+    if (path.startsWith('/dashboard/pengajuan') && (role === 'Staf' || role === 'Koordinator')) {
+      return NextResponse.redirect(new URL('/dashboard/staf', request.url));
+    }
   }
 
   return supabaseResponse;

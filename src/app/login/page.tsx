@@ -32,11 +32,10 @@ export default function LoginPage() {
 
         const userRole = profile?.role || 'Pengaju';
 
-        if (userRole === 'Staf' || userRole === 'Koordinator') {
-          router.replace('/dashboard/staf');
-        } else {
+        if (user) {
           router.replace('/dashboard/pengajuan');
-        }
+        } 
+
       } else {
         setIsChecking(false);
       }

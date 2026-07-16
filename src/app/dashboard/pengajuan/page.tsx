@@ -7,7 +7,7 @@ import { useMemo } from 'react';
 import { notifications } from '@mantine/notifications';
 import UserDetailDrawer from '../../../components/userDetailDrawer';
 import {
-  AppShell, SimpleGrid, Paper, Text, Group, Badge, Avatar, Table, NavLink, Stack, Box, Kbd, 
+  AppShell, SimpleGrid, Paper, Text, Group, Badge, Avatar, Table, NavLink, Stack, Box, Kbd,
   Tooltip, Modal, Timeline, FileInput, Textarea, Button, TextInput, Select, ActionIcon, Divider, Loader, Center, Drawer
 } from '@mantine/core';
 import {
@@ -92,12 +92,12 @@ export default function UserDashboard() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'requests' },
-        () => {
-          const checkUser = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) fetchUserRequests(user.id);
-          };
-          checkUser();
+        (payload) => {
+          if (payload.new && 'id' in payload.new) {
+            fetchSingleUpdatedMyRequest(payload.new.id as string);
+          } else if (payload.eventType === 'DELETE' && payload.old && 'id' in payload.old) {
+            setMyRequests(prev => prev.filter(r => r.id !== payload.old.id));
+          }
         }
       )
       .subscribe();
@@ -192,6 +192,29 @@ export default function UserDashboard() {
       .order('created_at', { ascending: false });
 
     if (data) setMyRequests(data as any);
+  };
+
+  const fetchSingleUpdatedMyRequest = async (requestId: string) => {
+    const { data } = await supabase
+      .from('requests')
+      .select(`
+        id, ticket_number, request_title, description, status, total_hold_days, created_at, updated_at, file_url, urgency, custom_sla_days,
+        user_profile:user_id (full_name, division, email),
+        categories:category_id (id, name, sla_days),
+        sub_categories:sub_category_id (name, sla_days),
+        pic:current_pic_id (full_name),
+        attachments (id, file_url, type)
+      `)
+      .eq('id', requestId)
+      .maybeSingle();
+
+    if (data) {
+      setMyRequests(prev => {
+        const exists = prev.find(r => r.id === requestId);
+        if (exists) return prev.map(r => r.id === requestId ? (data as any) : r);
+        return [data as any, ...prev];
+      });
+    }
   };
 
   const handleOpenTimeline = async (req: MyRequestItem) => {

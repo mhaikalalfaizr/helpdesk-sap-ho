@@ -3,6 +3,7 @@
   import { useState, useEffect } from 'react';
   import { useRouter } from 'next/navigation';
   import { useMemo } from 'react';
+  import { TICKET_STATUS, type TicketStatus} from '../../../utils/constants';
   import { createClient } from '@/lib/supabase/client';
   import { notifications } from '@mantine/notifications';
   import RejectModal from '../../../components/rejectModal';
@@ -105,9 +106,13 @@
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'requests' },
-          () => {
-            initPic();
+          (payload) => {
+          if (payload.new && 'id' in payload.new) {
+            fetchSingleUpdatedRequest(payload.new.id as string);
+          } else if (payload.old && 'id' in payload.old && payload.eventType === 'DELETE') {
+            setRequests(prev => prev.filter(r => r.id !== payload.old.id));
           }
+        }
         )
         .subscribe();
 
@@ -131,9 +136,7 @@
         .maybeSingle();
 
       if (!profileData || (profileData.role !== 'Koordinator' && profileData.role !== 'Staf')) {
-        if (profileData?.role === 'Pengaju') {
-          router.replace('/dashboard/pengajuan');
-        } else {
+        {
           await supabase.auth.signOut();
           router.replace('/login');
         }
@@ -179,6 +182,29 @@
 
       setLoading(false);
     };
+
+    const fetchSingleUpdatedRequest = async (requestId: string) => {
+        const { data } = await supabase
+          .from('requests')
+          .select(`
+            id, ticket_number, request_title, description, status, total_hold_days, created_at, updated_at, file_url, current_pic_id, urgency, custom_sla_days,
+            profiles:user_id (full_name, unit_kerja, division, email),
+            categories:category_id (id, name, sla_days),
+            sub_categories:sub_category_id (name, sla_days),
+            pic:current_pic_id (full_name),
+            attachments (id, file_name, file_url, type)
+          `)
+          .eq('id', requestId)
+          .maybeSingle();
+
+        if (data) {
+          setRequests(prev => {
+            const exists = prev.find(r => r.id === requestId);
+            if (exists) return prev.map(r => r.id === requestId ? (data as any) : r);
+            return [data as any, ...prev];
+          });
+        }
+      };
 
     const handleOpenTimeline = async (req: RequestItem) => {
       setSelectedRequest(req);
@@ -313,17 +339,17 @@
       }
     };
 
-    const updateDatabaseStatus = async (id: string, payload: any, logStatusName: string, notes: string = 'Sinkronisasi status birokrasi manual oleh Staf') => {
+    const updateDatabaseStatus = async (id: string, payload: any, logStatusName: TicketStatus, notes: string = 'Sinkronisasi status birokrasi manual oleh Staf') => {
       try {
         const targetRequest = requests.find(r => r.id === id);
 
-        const crucialStatuses = [
-          'Sedang Ditangguhkan di Staf',
-          'Sedang Ditangguhkan di Head Office',
-          'Sedang Ditangguhkan di Holding',
-          'Ditolak',
-          'Selesai (Rilis PRD)',
-          'Disetujui'
+        const crucialStatuses: string[] = [
+          TICKET_STATUS.HOLD_STAF,
+          TICKET_STATUS.HOLD_HO,
+          TICKET_STATUS.HOLD_HOLDING,
+          TICKET_STATUS.DITOLAK,
+          TICKET_STATUS.RILIS_PRD,
+          TICKET_STATUS.DISETUJUI
         ];
 
         if (targetRequest && crucialStatuses.includes(logStatusName)) {
@@ -400,29 +426,29 @@
     };
 
     const handleNextStep = async (req: RequestItem) => {
-      let nextStatus = '';
+      let nextStatus : TicketStatus;
 
       if (req.categories?.name === 'Tiket Lainnya' || req.categories?.id === 4) {
         switch (req.status) {
-          case 'Dikirim': nextStatus = 'Dalam Proses oleh Staf'; break;
-          case 'Dalam Proses oleh Staf': nextStatus = 'Dalam Tahap Elisitasi Kebutuhan Pengguna'; break;
-          case 'Dalam Tahap Elisitasi Kebutuhan Pengguna': nextStatus = 'Dalam Tahap Pelaporan ke Konsultan'; break;
-          case 'Dalam Tahap Pelaporan ke Konsultan': nextStatus = 'Dalam Tahap Pengembangan'; break;
-          case 'Dalam Tahap Pengembangan': nextStatus = 'Dalam Tahap Pengujian Penerimaan Pengguna (UAT)'; break;
-          case 'Dalam Tahap Pengujian Penerimaan Pengguna (UAT)': nextStatus = 'Selesai (Rilis PRD)'; break;
+          case TICKET_STATUS.DIKIRIM : nextStatus = TICKET_STATUS.PROSES_STAF; break;
+          case TICKET_STATUS.PROSES_STAF: nextStatus = TICKET_STATUS.ELISITASI; break;
+          case TICKET_STATUS.ELISITASI : nextStatus = TICKET_STATUS.LAPOR_KONSULTAN ; break;
+          case TICKET_STATUS.LAPOR_KONSULTAN : nextStatus = TICKET_STATUS.PENGEMBANGAN; break;
+          case TICKET_STATUS.PENGEMBANGAN : nextStatus = TICKET_STATUS.UAT; break;
+          case TICKET_STATUS.UAT : nextStatus = TICKET_STATUS.RILIS_PRD; break;
           default: return;
         }
 
-        if (req.status === 'Dalam Tahap Pengujian Penerimaan Pengguna (UAT)') {
+        if (req.status === TICKET_STATUS.UAT) {
           await updateDatabaseStatus(req.id, { status: nextStatus }, nextStatus, 'Tiket selesai, PRD dirilis.');
           return;
         }
       }
       else {
         switch (req.status) {
-          case 'Dikirim': nextStatus = 'Dalam Proses oleh Staf'; break;
-          case 'Dalam Proses oleh Staf': nextStatus = 'Dalam Proses oleh Head Office'; break;
-          case 'Dalam Proses oleh Head Office': nextStatus = 'Dalam Proses oleh Holding'; break;
+          case TICKET_STATUS.DIKIRIM : nextStatus = TICKET_STATUS.PROSES_STAF; break;
+          case TICKET_STATUS.PROSES_STAF: nextStatus = TICKET_STATUS.PROSES_HO; break;
+          case TICKET_STATUS.PROSES_HO : nextStatus = TICKET_STATUS.PROSES_HOLDING; break;
           default: return;
         }
       }
@@ -511,9 +537,9 @@
       let nextStatus = '';
 
       if (req.status.startsWith('Dalam Proses oleh')) {
-        if (req.status.includes('Staf')) nextStatus = 'Sedang Ditangguhkan di Staf';
-        else if (req.status.includes('Head Office')) nextStatus = 'Sedang Ditangguhkan di Head Office';
-        else if (req.status.includes('Holding')) nextStatus = 'Sedang Ditangguhkan di Holding';
+        if (req.status.includes('Staf')) nextStatus = TICKET_STATUS.HOLD_STAF;
+        else if (req.status.includes('Head Office')) nextStatus = TICKET_STATUS.HOLD_HO;
+        else if (req.status.includes('Holding')) nextStatus = TICKET_STATUS.HOLD_HOLDING;
 
         if (!nextStatus) {
           notifications.show({ title: 'Gagal Memproses', message: `Sub-status tidak dikenali dari "${req.status}"`, color: 'red' });
@@ -570,9 +596,9 @@
         }
 
       } else if (req.status.startsWith('Sedang Ditangguhkan di')) {
-        if (req.status.includes('Staf')) nextStatus = 'Dalam Proses oleh Staf';
-        else if (req.status.includes('Head Office')) nextStatus = 'Dalam Proses oleh Head Office';
-        else if (req.status.includes('Holding')) nextStatus = 'Dalam Proses oleh Holding';
+        if (req.status.includes('Staf')) nextStatus = TICKET_STATUS.PROSES_STAF;
+        else if (req.status.includes('Head Office')) nextStatus = TICKET_STATUS.PROSES_HO;
+        else if (req.status.includes('Holding')) nextStatus = TICKET_STATUS.PROSES_HO;
 
         if (!nextStatus) {
           notifications.show({ title: 'Gagal Memproses', message: `Sub-status tidak dikenali dari "${req.status}"`, color: 'red' });
@@ -664,14 +690,14 @@
     };
 
     const totalCount = requests.length;
-    const unassignedCount = requests.filter(r => r.status === 'Dikirim').length;
+    const unassignedCount = requests.filter(r => r.status === TICKET_STATUS.DIKIRIM).length;
     const processCount = requests.filter(r => r.status.startsWith('Dalam Proses')).length;
     const holdCount = requests.filter(r => r.status.startsWith('Sedang Ditangguhkan')).length;
-    const archivedCount = requests.filter(r => r.status === 'Disetujui' || r.status === 'Ditolak').length;
+    const archivedCount = requests.filter(r => r.status === TICKET_STATUS.DISETUJUI || r.status === TICKET_STATUS.DITOLAK).length;
 
     const overdueCount = useMemo(() => {
       return requests.filter(req => {
-        const isFinal = req.status === 'Disetujui' || req.status === 'Ditolak' || req.status === 'Selesai (Rilis PRD)';
+        const isFinal = req.status === TICKET_STATUS.DISETUJUI || req.status === TICKET_STATUS.DITOLAK || req.status === TICKET_STATUS.RILIS_PRD;
         if (isFinal) return false;
 
         const effectiveSlaDays = (req.categories?.id === 4 || req.categories?.name === 'Tiket Lainnya')
@@ -685,16 +711,16 @@
       let filtered = [...requests];
 
       if (activeFilter === 'unassigned') {
-        filtered = filtered.filter(r => r.status === 'Dikirim');
+        filtered = filtered.filter(r => r.status === TICKET_STATUS.DIKIRIM);
       } else if (activeFilter === 'process') {
         filtered = filtered.filter(r => r.status.startsWith('Dalam Proses'));
       } else if (activeFilter === 'hold') {
         filtered = filtered.filter(r => r.status.startsWith('Sedang Ditangguhkan'));
       } else if (activeFilter === 'archived') {
-        filtered = filtered.filter(r => r.status === 'Disetujui' || r.status === 'Ditolak');
+        filtered = filtered.filter(r => r.status === TICKET_STATUS.DISETUJUI || r.status === TICKET_STATUS.DITOLAK);
       } else if (activeFilter === 'overdue') {
         filtered = filtered.filter(req => {
-          const isFinal = req.status === 'Disetujui' || req.status === 'Ditolak' || req.status === 'Selesai (Rilis PRD)';
+          const isFinal = req.status === TICKET_STATUS.DISETUJUI || req.status === TICKET_STATUS.DITOLAK || req.status === TICKET_STATUS.RILIS_PRD;
           if (isFinal) return false;
 
           const effectiveSlaDays = (req.categories?.id === 4 || req.categories?.name === 'Tiket Lainnya')
@@ -1014,11 +1040,11 @@
                             color={
                               isHoldState
                               ? 'orange'
-                              : (req.status === 'Disetujui' || req.status === 'Selesai (Rilis PRD)')
+                              : (req.status === TICKET_STATUS.DISETUJUI || req.status === TICKET_STATUS.RILIS_PRD)
                               ? 'green'
-                              : req.status === 'Ditolak'
+                              : req.status === TICKET_STATUS.DITOLAK
                               ? 'red'
-                              : req.status === 'Dikirim'
+                              : req.status === TICKET_STATUS.DIKIRIM
                               ? 'cyan'
                               : 'blue'}
                             variant="light"
@@ -1046,21 +1072,21 @@
                               </Badge>
                             ) : (
                               <>
-                                <Tooltip label={req.status === 'Dalam Proses oleh Holding' ? 'Upload Dokumen Akhir & Setujui Pengajuan' : 'Lanjutkan proses ke tahap berikutnya'} position="top" withArrow>
+                                <Tooltip label={req.status === TICKET_STATUS.PROSES_HOLDING ? 'Upload Dokumen Akhir & Setujui Pengajuan' : 'Lanjutkan proses ke tahap berikutnya'} position="top" withArrow>
                                   <ActionIcon
                                     size="md"
                                     variant="light"
                                     color="green"
                                     disabled={isHoldState}
                                     onClick={() => {
-                                      if (req.status === 'Dalam Proses oleh Holding') {
+                                      if (req.status === TICKET_STATUS.PROSES_HOLDING) {
                                         setFinalUploadRequest(req);
                                       } else {
                                         setConfirmNextRequest(req);
                                       }
                                     }}
                                   >
-                                    {req.status === 'Dalam Proses oleh Holding' ? <IconFileCheck size={18} /> : <IconArrowRight size={18} />}
+                                    {req.status === TICKET_STATUS.PROSES_HOLDING ? <IconFileCheck size={18} /> : <IconArrowRight size={18} />}
                                   </ActionIcon>
                                 </Tooltip>
 

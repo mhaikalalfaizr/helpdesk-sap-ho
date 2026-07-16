@@ -1,4 +1,5 @@
 import { notifications } from "@mantine/notifications";
+import { SupabaseClient } from '@supabase/supabase-js';
 
 export const countWorkingDays = (startDate: number, endDate: number, publicHolidays: string[]) => {
   let count = 0;
@@ -27,7 +28,7 @@ export const countWorkingDays = (startDate: number, endDate: number, publicHolid
   return count;
 };
 
-export const handleDownloadSecureFile = async (supabase: any, rawUrl: string, providedFileName?: string) => {
+export const handleDownloadSecureFile = async (supabase: SupabaseClient, rawUrl: string, providedFileName?: string) => {
     try {
       const pathSegments = rawUrl.split('/documents/');
       if (pathSegments.length < 2) throw new Error("Format URL tidak valid");
