@@ -1,5 +1,6 @@
 export const TICKET_STATUS = {
   DIKIRIM: 'Dikirim',
+  DITUGASKAN: 'Ditugaskan',
   PROSES_STAF: 'Dalam Proses oleh Staf',
   PROSES_HO: 'Dalam Proses oleh Head Office',
   PROSES_HOLDING: 'Dalam Proses oleh Holding',

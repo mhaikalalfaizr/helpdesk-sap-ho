@@ -1,4 +1,4 @@
-import { Drawer, Group, Badge, Text, Stack, Box, Paper, Button, Divider, Timeline } from '@mantine/core';
+import { Drawer, Group, Badge, Text, Stack, Box, Paper, Button, Divider, Timeline, Tooltip, ActionIcon } from '@mantine/core';
 import { IconDownload } from '@tabler/icons-react';
 
 interface UserDetailDrawerProps {
@@ -54,42 +54,42 @@ export default function UserDetailDrawer({
           {request.attachments && request.attachments.length > 0 && (
             <>
               <Box>
-                <Text size="xs" c="dimmed" fw={600} mb={4}>LAMPIRAN BERKAS AWAL ({request.attachments.filter((a: any) => a.type === 'Dokumen_Awal').length} File)</Text>
+                <Text size="xs" c="dimmed" fw={600} mb={4}>LAMPIRAN DOKUMEN AWAL ({request.attachments.filter((a: any) => a.type === 'Dokumen_Awal').length} Berkas)</Text>
                 <Stack gap="xs">
                   {request.attachments
                     .filter((att: any) => att.type === 'Dokumen_Awal')
                     .map((file: any, idx: number) => (
-                      <Button
-                        key={file.id || idx}
-                        onClick={() => onDownload(file.file_url, file.file_name)}
-                        variant="outline" color="ptpn4Green.9" fullWidth leftSection={<IconDownload size={16} />}
-                        styles={{ inner: { justifyContent: 'flex-start' } }}
-                      >
-                        <Text size="xs" truncate style={{ maxWidth: '90%' }}>
-                          {file.file_name || `Unduh Dokumen Lampiran ${idx + 1}`}
-                        </Text>
-                      </Button>
-                    ))}
-                </Stack>
-              </Box>
-
-              {request.attachments.some((a: any) => a.type === 'Dokumen_Final') && (
-                <Box mt="sm">
-                  <Text size="xs" c="ptpn4Green.9" fw={800} mb={4}>📥 HASIL DOKUMEN AKHIR</Text>
-                  <Stack gap="xs">
-                    {request.attachments
-                      .filter((att: any) => att.type === 'Dokumen_Final')
-                      .map((file: any, idx: number) => (
-                        <Button
+                          <Button
                           key={file.id || idx}
                           onClick={() => onDownload(file.file_url, file.file_name)}
-                          variant="filled" color="ptpn4Green.9" fullWidth leftSection={<IconDownload size={16} />}
+                          variant="outline" color="ptpn4Green.9" fullWidth leftSection={<IconDownload size={16} />}
                           styles={{ inner: { justifyContent: 'flex-start' } }}
                         >
                           <Text size="xs" truncate style={{ maxWidth: '90%' }}>
                             {file.file_name || `Unduh Dokumen Lampiran ${idx + 1}`}
                           </Text>
                         </Button>
+                    ))}
+                </Stack>
+              </Box>
+
+              {request.attachments.some((a: any) => a.type === 'Dokumen_Final') && (
+                <Box mt="sm">
+                  <Text size="xs" c="ptpn4Green.9" fw={800} mb={4}>LAMPIRAN DOKUMEN FINAL ({request.attachments.filter((a: any) => a.type === 'Dokumen_Final').length} Berkas)</Text>
+                  <Stack gap="xs">
+                    {request.attachments
+                      .filter((att: any) => att.type === 'Dokumen_Final')
+                      .map((file: any, idx: number) => (
+                          <Button
+                        key={file.id || idx}
+                        onClick={() => onDownload(file.file_url, file.file_name)}
+                        variant="filled" color="ptpn4Green.9" fullWidth leftSection={<IconDownload size={16} />}
+                        styles={{ inner: { justifyContent: 'flex-start' } }}
+                      >
+                        <Text size="xs" truncate style={{ maxWidth: '90%' }}>
+                          {file.file_name || `Unduh Dokumen Lampiran ${idx + 1}`}
+                        </Text>
+                      </Button>
                       ))}
                   </Stack>
                 </Box>

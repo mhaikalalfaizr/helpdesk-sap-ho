@@ -15,7 +15,9 @@ export async function POST(request: Request) {
         cookies: {
           getAll() { return cookieStore.getAll(); },
           setAll(cookiesToSet) {
-            try { cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options)); } catch (error) {}
+            try { cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options)); } catch (error) {
+              console.error('Gagal mengatur cookie email:', error);
+            }
           },
         },
       }
@@ -29,6 +31,16 @@ export async function POST(request: Request) {
 
     const { ticketNumber, title, status, notes, recipientEmail, recipientName } = await request.json();
 
+    const { data: ticket, error: ticketError } = await supabase
+      .from('requests')
+      .select('id, request_title')
+      .eq('ticket_number', ticketNumber)
+      .single();
+
+    if (ticketError || !ticket) {
+      return NextResponse.json({ error: 'Akses Ditolak: Tiket tidak valid atau tidak diizinkan.' }, { status: 403 });
+    }
+
     if (!recipientEmail || !ticketNumber || !title || !status || !recipientName) {
       return NextResponse.json(
         { error: 'Data tidak lengkap. Pastikan email, nama, nomor tiket, judul, dan status terisi.' },
@@ -40,7 +52,7 @@ export async function POST(request: Request) {
       <div style="font-family: sans-serif; padding: 20px; color: #334155; max-width: 600px; border: 1px solid #e2e8f0; border-radius: 8px;">
         <h2 style="color: #0e422a;">Helpdesk SAP HO Notification</h2>
         <p>Halo <strong>${recipientName}</strong>,</p>
-        <p>Terdapat pembaruan status penting terkait pelacakan dokumen di sistem antrean pusat:</p>
+        <p>Terdapat pembaruan status penting terkait pelacakan dokumen di sistem helpdesk:</p>
 
         <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
           <tr style="background-color: #f8fafc;">
@@ -49,7 +61,7 @@ export async function POST(request: Request) {
           </tr>
           <tr>
             <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">Judul Permohonan</td>
-            <td style="padding: 10px; border: 1px solid #e2e8f0;">${title}</td>
+            <td style="padding: 10px; border: 1px solid #e2e8f0;">${ticket.request_title}</td>
           </tr>
           <tr style="background-color: #f8fafc;">
             <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">Status Terbaru</td>
@@ -71,7 +83,7 @@ export async function POST(request: Request) {
     const { data, error } = await resend.emails.send({
       from: 'Helpdesk SAP HO <no-reply@sap-ho.my.id>',
       to: recipientEmail,
-      subject: `[SAP HO] Update Status Tiket ${ticketNumber} - ${status}`,
+      subject: `[SAP HO] Pembaruan Status Tiket ${ticketNumber} - ${status}`,
       html: emailHtml,
     });
 

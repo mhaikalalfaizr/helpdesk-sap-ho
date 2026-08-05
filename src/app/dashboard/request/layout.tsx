@@ -37,14 +37,17 @@ export default function PengajuanLayout({ children }: { children: React.ReactNod
   };
 
   return (
-    <AppShell header={{ height: 75 }} navbar={{ width: 280, breakpoint: 'sm' }} padding="xl" bg="#f8fafc">
+    <AppShell header={{ height: 75 }}
+      navbar={{ width: 300, breakpoint: 'sm' }}
+      padding="xl">
+
       <AppShell.Header bg="white" px="xl" style={{ borderBottom: '1px solid rgba(226, 232, 240, 0.8)' }}>
         <Group justify="space-between" h="100%">
           <Group gap="lg" h="100%">
             <Avatar src={null} alt="User" color="ptpn4Green.9" radius="xl" />
             <Box>
               <Text size="sm" fw={600} c="slateClean.9">Halo, {currentUserName}</Text>
-              <Text size="xs" c="dimmed">Selamat datang di Sistem Pengajuan</Text>
+              <Text size="xs" c="dimmed">Selamat datang di {process.env.NEXT_PUBLIC_APP_NAME}</Text>
             </Box>
           </Group>
           <Group gap="lg" h="100%">
@@ -62,7 +65,7 @@ export default function PengajuanLayout({ children }: { children: React.ReactNod
               <Box bg="ptpn4Green.0" p="xs" style={{ borderRadius: '12px', display: 'flex', alignItems: 'center' }}>
                 <IconChecklist size={24} color="#0e422a" />
               </Box>
-              <Text fw={800} size="xl" lts="tight" c="ptpn4Green.9">Sistem Pengajuan</Text>
+              <Text fw={800} size="xl" lts="tight" c="ptpn4Green.9">{process.env.NEXT_PUBLIC_APP_NAME}</Text>
             </Group>
 
             <Stack gap={4}>
@@ -70,15 +73,15 @@ export default function PengajuanLayout({ children }: { children: React.ReactNod
               <NavLink
                 label="Buat Pengajuan"
                 leftSection={<IconFilePlus size={18} stroke={1.5} />}
-                active={pathname === '/dashboard/pengajuan'}
-                onClick={() => router.push('/dashboard/pengajuan')}
+                active={pathname === '/dashboard/request'}
+                onClick={() => router.push('/dashboard/request')}
                 style={{ borderRadius: '8px' }} py="sm"
               />
               <NavLink
                 label="Lacak Status Tiket"
                 leftSection={<IconHistory size={18} stroke={1.5} />}
-                active={pathname === '/dashboard/pengajuan/history'}
-                onClick={() => router.push('/dashboard/pengajuan/history')}
+                active={pathname === '/dashboard/request/history'}
+                onClick={() => router.push('/dashboard/request/history')}
                 style={{ borderRadius: '8px' }} py="sm"
                 rightSection={processCount > 0 ? <Badge size="xs" color="ptpn4Green.9" variant="filled">{processCount}</Badge> : null}
               />

@@ -1,9 +1,11 @@
 import { Drawer, Group, Badge, Text, Stack, Box, Paper, NumberInput, Button, ActionIcon, Tooltip, Divider, Timeline } from '@mantine/core';
 import { IconPencil, IconDownload } from '@tabler/icons-react';
+import { RequestItem, RequestLog } from '@/utils/types';
+import { getProjectedDate } from '@/utils/helpers';
 
 interface DetailDrawerProps {
-  detail: any;
-  historyLogs: any[];
+  detail: RequestItem | null;
+  historyLogs: RequestLog[];
   loadingTimeline: boolean;
   onClose: () => void;
   editingSlaId: string | null;
@@ -25,13 +27,6 @@ export default function DetailDrawer({
   currentUserRole, currentPicId, onDownload
 }: DetailDrawerProps) {
 
-  const getProjectedDate = (daysToAdd: number) => {
-    if (!daysToAdd) return '-';
-    const projected = new Date();
-    projected.setDate(projected.getDate() + daysToAdd);
-    return projected.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-  };
-
   return (
     <Drawer
       opened={detail !== null}
@@ -47,13 +42,13 @@ export default function DetailDrawer({
       position="right"
       size="md"
       styles={{
-        header: { borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' },
-        content: { backgroundColor: '#ffffff' }
+        header: { borderBottom: '1px solid var(--mantine-color-slateClean-2)', paddingBottom: '12px' },
+        content: { backgroundColor: 'var(--mantine-color-white)' }
       }}
     >
       {detail && (
         <Stack gap="lg" mt="md">
-          {}
+          { }
           <Box p="sm" bg="slateClean.0" style={{ borderRadius: '8px' }}>
             <Text size="xs" c="dimmed" fw={600} mb={4}>INFORMASI PENGAJU</Text>
             <Text fw={700} size="sm" c="slateClean.8">{detail.profiles?.full_name}</Text>
@@ -65,7 +60,7 @@ export default function DetailDrawer({
             </Text>
           </Box>
 
-          {}
+          { }
           <Box>
             <Text size="xs" c="dimmed" fw={600} mb={2}>JUDUL PENGAJUAN</Text>
             <Text fw={700} size="md" c="slateClean.9" mb="xs">{detail.request_title}</Text>
@@ -76,7 +71,7 @@ export default function DetailDrawer({
             </Badge>
           </Box>
 
-          {}
+          { }
           <Box>
             <Text size="xs" c="dimmed" fw={600} mb={4}>TARGET BATAS WAKTU (SLA)</Text>
             {editingSlaId === detail.id ? (
@@ -101,34 +96,34 @@ export default function DetailDrawer({
             ) : (
               <Group gap="xs">
                 <Text size="sm" fw={600} c="slateClean.8">
-                  {detail.categories?.id === 4 || detail.categories?.name === 'Tiket Lainnya'
-                     ? (detail.custom_sla_days ? `${detail.custom_sla_days} Hari` : 'Belum Ditentukan')
-                     : `${detail.categories?.sla_days} Hari`
+                  {detail.categories?.name === 'Tiket Lainnya'
+                    ? (detail.custom_sla_days ? `${detail.custom_sla_days} Hari` : 'Belum Ditentukan')
+                    : `${detail.categories?.sla_days} Hari`
                   }
                 </Text>
-                {(detail.categories?.id === 4 || detail.categories?.name === 'Tiket Lainnya') &&
-                 (currentUserRole === 'Koordinator' || detail.current_pic_id === currentPicId) && (
-                  <Tooltip label="Ubah batas waktu SLA" position="top">
-                    <ActionIcon size="sm" variant="subtle" color="blue" onClick={() => onEditSla(detail.id, detail.custom_sla_days || '')}>
-                      <IconPencil size={14} />
-                    </ActionIcon>
-                  </Tooltip>
-                )}
+                {(detail.categories?.name === 'Tiket Lainnya') &&
+                  (currentUserRole === 'Koordinator' || detail.current_pic_id === currentPicId) && (
+                    <Tooltip label="Ubah batas waktu SLA" position="top">
+                      <ActionIcon size="sm" variant="subtle" color="blue" onClick={() => onEditSla(detail.id, detail.custom_sla_days || '')}>
+                        <IconPencil size={14} />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
               </Group>
             )}
           </Box>
 
-          {}
+          { }
           <Box>
             <Text size="xs" c="dimmed" fw={600} mb={4}>DESKRIPSI & KETERANGAN DOKUMEN</Text>
-            <Paper p="md" withBorder radius="md" bg="#f8fafc" style={{ borderColor: '#e2e8f0' }}>
+            <Paper p="md" withBorder radius="md" bg="var(--mantine-color-slateClean-0)" style={{ borderColor: 'var(--mantine-color-slateClean-2)' }}>
               <Text size="sm" c="slateClean.7" style={{ whiteSpace: 'pre-line', lineHeight: '1.6' }}>
                 {detail.description || 'Pengaju tidak menyertakan keterangan tertulis pada dokumen ini.'}
               </Text>
             </Paper>
           </Box>
 
-          {}
+          { }
           {detail.attachments && detail.attachments.filter((a: any) => a.type === 'Dokumen_Awal').length > 0 ? (
             <Box>
               <Text size="xs" c="dimmed" fw={600} mb={4}>
@@ -165,7 +160,7 @@ export default function DetailDrawer({
 
           {detail.attachments?.some((a: any) => a.type === 'Dokumen_Final') && (
             <Box mt="sm">
-              <Text size="xs" c="ptpn4Green.9" fw={800} mb={4}>LAMPIRAN DOKUMEN AKHIR</Text>
+              <Text size="xs" c="ptpn4Green.9" fw={800} mb={4}>LAMPIRAN DOKUMEN FINAL</Text>
               <Stack gap="xs">
                 {detail.attachments
                   .filter((att: any) => att.type === 'Dokumen_Final')
@@ -185,7 +180,7 @@ export default function DetailDrawer({
             </Box>
           )}
 
-          {}
+          { }
           <Divider my="sm" label={<Text size="10px" fw={700} c="slateClean.4" lts="0.5px">RIWAYAT ALUR DOKUMEN</Text>} labelPosition="center" />
           {loadingTimeline ? (
             <Text size="xs" ta="center" c="dimmed" py="sm">Memuat riwayat log...</Text>

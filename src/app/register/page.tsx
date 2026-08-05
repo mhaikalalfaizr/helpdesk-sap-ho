@@ -81,7 +81,7 @@ export default function RegisterPage() {
       return;
     }
 
-    const allowedDomains = ['@gmail.com', '@sap-ho.my.id']; 
+    const allowedDomains = ['@gmail.com', '@sap-ho.my.id'];
     const isDomainAllowed = allowedDomains.some(domain => email.toLowerCase().endsWith(domain));
 
     if (!isDomainAllowed) {
@@ -320,7 +320,7 @@ export default function RegisterPage() {
               component={Link}
               href="/login"
               fw={700}
-              color="ptpn4Green.9"  
+              color="ptpn4Green.9"
               style={{ textDecoration: 'none' }}
             >
               Masuk

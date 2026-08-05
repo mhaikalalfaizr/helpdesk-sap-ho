@@ -33,8 +33,8 @@ export default function LoginPage() {
         const userRole = profile?.role || 'Pengaju';
 
         if (user) {
-          router.replace('/dashboard/pengajuan');
-        } 
+          router.replace('/dashboard/request');
+        }
 
       } else {
         setIsChecking(false);
@@ -66,7 +66,6 @@ export default function LoginPage() {
         if (profileError) throw profileError;
 
         if (!profileData) {
-          console.log("ID dari Auth yang dicari:", authData.user.id);
           notifications.show({
             title: 'Profil Tidak Ditemukan',
             message: `ID '${authData.user.id.substring(0, 8)}...' belum terdaftar.`,
@@ -87,15 +86,15 @@ export default function LoginPage() {
         });
 
         if (userRole === 'Staf' || userRole === 'Koordinator') {
-          router.push('/dashboard/staf');
+          router.push('/dashboard/staff');
         } else {
-          router.push('/dashboard/pengajuan');
+          router.push('/dashboard/request');
         }
       }
     } catch (error: any) {
       notifications.show({
         title: 'Gagal Masuk',
-        message: error.message || 'Email atau kata sandi yang Anda masukkan salah.',
+        message: 'Email atau kata sandi yang Anda masukkan salah.',
         color: 'red',
         icon: <IconAlertCircle size={16} />,
         autoClose: 5000,

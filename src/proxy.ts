@@ -42,18 +42,18 @@ export async function proxy(request: NextRequest) {
 
     if (isAuthRoute) {
       if (role === 'Staf' || role === 'Koordinator') {
-        return NextResponse.redirect(new URL('/dashboard/staf', request.url));
+        return NextResponse.redirect(new URL('/dashboard/staff', request.url));
       } else {
-        return NextResponse.redirect(new URL('/dashboard/pengajuan', request.url));
+        return NextResponse.redirect(new URL('/dashboard/request', request.url));
       }
     }
 
-    if (path.startsWith('/dashboard/staf') && role === 'Pengaju') {
-      return NextResponse.redirect(new URL('/dashboard/pengajuan', request.url));
+    if (path.startsWith('/dashboard/staff') && role === 'Pengaju') {
+      return NextResponse.redirect(new URL('/dashboard/request', request.url));
     }
 
-    if (path.startsWith('/dashboard/pengajuan') && (role === 'Staf' || role === 'Koordinator')) {
-      return NextResponse.redirect(new URL('/dashboard/staf', request.url));
+    if (path.startsWith('/dashboard/request') && (role === 'Staf' || role === 'Koordinator')) {
+      return NextResponse.redirect(new URL('/dashboard/staff', request.url));
     }
   }
 
