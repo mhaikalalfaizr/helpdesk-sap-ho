@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { notifications } from '@mantine/notifications';
 import { Modal, TextInput, Select, Button, Stack, Group, Text } from '@mantine/core';
-import { IconBriefcase, IconLock, IconMail, IconUser } from '@tabler/icons-react';
+import { IconBriefcase, IconLock, IconMail, IconUser} from '@tabler/icons-react';
 import { UserProfile } from '@/utils/types';
 
 type ManagedUser = UserProfile & {
@@ -48,7 +48,9 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [unitKerja, setUnitKerja] = useState<string | null>('');
   const [division, setDivision] = useState<string | null>('');
   const [role, setRole] = useState<string | null>('Pengaju');
@@ -141,12 +143,16 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
       setDivision(editingUser.unit_kerja === 'Head Office' ? editingUser.division || '' : '');
       setRole(editingUser.role || 'Pengaju');
       setPassword('');
+      setConfirmPassword('');
       setNewPassword('');
+      setConfirmNewPassword('');
     } else {
       setFullName('');
       setEmail('');
       setPassword('');
+      setConfirmPassword('');
       setNewPassword('');
+      setConfirmNewPassword('');
       setUnitKerja('');
       setDivision('');
       setRole('Pengaju');
@@ -180,12 +186,22 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
     }
 
     if (!isEditMode && password.length < 8) {
-      notifications.show({ title: 'Validasi Gagal', message: 'Password minimal 8 karakter.', color: 'red' });
+      notifications.show({ title: 'Validasi Gagal', message: 'Kata sandi minimal 8 karakter.', color: 'red' });
+      return;
+    }
+
+    if (!isEditMode && password !== confirmPassword) {
+      notifications.show({ title: 'Validasi Gagal', message: 'Konfirmasi kata sandi tidak cocok.', color: 'red' });
       return;
     }
 
     if (isEditMode && newPassword && newPassword.length < 8) {
-      notifications.show({ title: 'Validasi Gagal', message: 'Password baru minimal 8 karakter.', color: 'red' });
+      notifications.show({ title: 'Validasi Gagal', message: 'Kata sandi baru minimal 8 karakter.', color: 'red' });
+      return;
+    }
+
+    if (isEditMode && newPassword && newPassword !== confirmNewPassword) {
+      notifications.show({ title: 'Validasi Gagal', message: 'Konfirmasi kata sandi baru tidak cocok.', color: 'red' });
       return;
     }
 
@@ -300,16 +316,6 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
       centered
     >
       <Stack gap="sm">
-        <TextInput
-          label="Nama Lengkap"
-          placeholder="Masukkan nama lengkap sesuai identitas"
-          value={fullName}
-          onChange={(e) => setFullName(e.currentTarget.value)}
-          leftSection={<IconUser size={16} stroke={1.5} color="#94a3b8" />}
-          required
-          radius="md"
-          styles={inputStyles}
-        />
 
         <TextInput
           label="Alamat Email"
@@ -323,20 +329,44 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
           description={isEditMode ? 'Email tidak dapat diubah.' : undefined}
           radius="md"
           styles={inputStyles}
+        />  
+
+        <TextInput
+          label="Nama Lengkap"
+          placeholder="Masukkan nama lengkap sesuai identitas"
+          value={fullName}
+          onChange={(e) => setFullName(e.currentTarget.value)}
+          leftSection={<IconUser size={16} stroke={1.5} color="#94a3b8" />}
+          required
+          radius="md"
+          styles={inputStyles}
         />
 
         {!isEditMode && (
-          <TextInput
-            label="Password Awal"
-            placeholder="Minimal 8 karakter"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.currentTarget.value)}
-            leftSection={<IconLock size={16} stroke={1.5} color="#94a3b8" />}
-            required
-            radius="md"
-            styles={inputStyles}
-          />
+          <>
+            <TextInput
+              label="Kata Sandi"
+              placeholder="Minimal 8 karakter"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.currentTarget.value)}
+              leftSection={<IconLock size={16} stroke={1.5} color="#94a3b8" />}
+              required
+              radius="md"
+              styles={inputStyles}
+            />
+            <TextInput
+              label="Konfirmasi Kata Sandi"
+              placeholder="Ketik ulang kata sandi"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.currentTarget.value)}
+              leftSection={<IconLock size={16} stroke={1.5} color="#94a3b8" />}
+              required
+              radius="md"
+              styles={inputStyles}
+            />
+          </>
         )}
 
         <Select
@@ -375,17 +405,32 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
         )}
 
         {isEditMode && (
-          <TextInput
-            label="Password Baru"
-            placeholder="Kosongkan jika tidak ingin mengubah password"
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.currentTarget.value)}
-            leftSection={<IconLock size={16} stroke={1.5} color="#94a3b8" />}
-            description="Minimal 8 karakter. Kosongkan jika tidak perlu diganti."
-            radius="md"
-            styles={inputStyles}
-          />
+          <>
+            <TextInput
+              label="Kata Sandi Baru"
+              placeholder="Kosongkan jika tidak ingin mengubah password"
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.currentTarget.value)}
+              leftSection={<IconLock size={16} stroke={1.5} color="#94a3b8" />}
+              description="Minimal 8 karakter. Kosongkan jika tidak perlu diganti."
+              radius="md"
+              styles={inputStyles}
+            />
+            {newPassword && (
+              <TextInput
+                label="Konfirmasi Kata Sandi Baru"
+                placeholder="Ketik ulang kata sandi baru"
+                type="password"
+                value={confirmNewPassword}
+                onChange={(e) => setConfirmNewPassword(e.currentTarget.value)}
+                leftSection={<IconLock size={16} stroke={1.5} color="#94a3b8" />}
+                required
+                radius="md"
+                styles={inputStyles}
+              />
+            )}
+          </>
         )}
 
         <Select

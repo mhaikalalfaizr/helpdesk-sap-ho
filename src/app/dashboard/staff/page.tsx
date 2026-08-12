@@ -921,7 +921,7 @@ export default function PicDashboard() {
                                 </Badge>
                               ) : !canExecute ? (
                                 <Badge color="gray.4" variant="outline" radius="sm" c="dimmed" size="md" fw="500" style={{ borderStyle: 'dashed', textTransform: 'none' }}>
-                                  🔒 Menunggu Penugasan dari Koordinator
+                                  🔒 Menunggu Penugasan
                                 </Badge>
                               ) : (
                                 <>

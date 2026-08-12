@@ -63,7 +63,7 @@ export default function StafLayout({ children }: { children: React.ReactNode }) 
             </Group>
 
             <Stack gap={4}>
-              <Text size="xs" fw={700} c="slateClean.4" px="sm" mb={4} lts="0.5px">MENU</Text>
+              <Text size="xs" fw={700} c="slateClean.4" px="sm" mb={4} lts="0.5px">MENU UTAMA</Text>
               <NavLink
                 label="Antrean Tiket"
                 leftSection={<IconLayoutDashboard size={18} stroke={1.5} />}

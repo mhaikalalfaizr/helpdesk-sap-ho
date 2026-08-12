@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { notifications } from '@mantine/notifications';
-import { Box, Stack, Text, Group, Button, Badge, Table, Select, Modal, ActionIcon, Tooltip, Paper } from '@mantine/core';
-import { IconPlus, IconEdit, IconUserOff, IconUserCheck, IconUsers, IconX } from '@tabler/icons-react';
+import { Box, Stack, Text, Group, Button, Badge, Table, Select, Modal, ActionIcon, Tooltip, Paper, TextInput } from '@mantine/core';
+import { IconPlus, IconEdit, IconUserOff, IconUserCheck, IconUsers, IconX, IconSearch } from '@tabler/icons-react';
 import UserFormModal from '../../../../components/modals/UserFormModal';
 import { UserProfile } from '@/utils/types';
 
@@ -37,6 +37,7 @@ export default function UserManagementPage() {
   const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
   const [confirmToggleUser, setConfirmToggleUser] = useState<ManagedUser | null>(null);
   const [isToggling, setIsToggling] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => { initPage(); }, []);
 
@@ -100,6 +101,11 @@ export default function UserManagementPage() {
     if (roleFilter && user.role !== roleFilter) return false;
     if (statusFilter === 'aktif' && !user.is_active) return false;
     if (statusFilter === 'nonaktif' && user.is_active) return false;
+    
+    const matchesSearch = 
+      user.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
+      
+    if (!matchesSearch) return false;
     return true;
   });
 
@@ -114,7 +120,7 @@ export default function UserManagementPage() {
       <Group justify="space-between" mb="xl" align="flex-end">
         <Stack gap="sm">
           <Text size="28px" fw={800} c="slateClean.9" style={{ letterSpacing: '-0.5px' }}>Manajemen Pengguna</Text>
-          <Text size="sm" c="dimmed">Kelola akun pengguna sistem — tambah, edit, dan atur status akses.</Text>
+          <Text size="sm" c="dimmed">Kelola akun pengguna sistem dengan tambah, edit, dan atur status akses.</Text>
         </Stack>
         <Button leftSection={<IconPlus size={16} />} color="ptpn4Green" size="sm" radius="md" onClick={handleOpenAdd}>Tambah Pengguna</Button>
       </Group>
@@ -126,14 +132,21 @@ export default function UserManagementPage() {
           <Box>
             <Group mb="md" gap="sm" align="center" justify="space-between">
               <Group gap="sm">
-                <Select placeholder="Semua Role" data={ROLE_OPTIONS} value={roleFilter} onChange={setRoleFilter} clearable w={{ base: '100%', sm: 200 }} styles={selectStyles} />
+                <TextInput
+                  placeholder="Cari nama pengguna"
+                  leftSection={<IconSearch size={16} />}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.currentTarget.value)}
+                  style={{ width: '300px' }}
+                />
+                <Select placeholder="Semua Jabatan" data={ROLE_OPTIONS} value={roleFilter} onChange={setRoleFilter} clearable w={{ base: '100%', sm: 200 }} styles={selectStyles} />
                 <Select placeholder="Semua Status" data={STATUS_OPTIONS} value={statusFilter} onChange={setStatusFilter} clearable w={{ base: '100%', sm: 200 }} styles={selectStyles} />
                 {hasFilter && (
                   <Button variant="light" color="gray" size="sm" radius="md" leftSection={<IconX size={14} />} onClick={() => { setRoleFilter(null); setStatusFilter(null); }}>Hapus Filter</Button>
                 )}
               </Group>
               <Text size="sm" c="dimmed">
-                Menampilkan <Text span fw={600} c="slateClean.8">{filteredUsers.length}</Text> dari <Text span fw={600} c="slateClean.8">{users.length}</Text> user
+                Menampilkan <Text span fw={600} c="slateClean.8">{filteredUsers.length}</Text> dari <Text span fw={600} c="slateClean.8">{users.length}</Text> pengguna
               </Text>
             </Group>
 
