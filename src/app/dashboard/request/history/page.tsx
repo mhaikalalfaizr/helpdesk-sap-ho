@@ -7,7 +7,7 @@ import { useMemo } from 'react';
 import { notifications } from '@mantine/notifications';
 import UserDetailDrawer from '../../../../components/UserDetailDrawer';
 import {
-  AppShell, SimpleGrid, Paper, Text, Group, Badge, Avatar, Table, Stack, Box,
+  SimpleGrid, Paper, Text, Group, Badge, Avatar, Table, Stack, Box,
   Tooltip, Button, TextInput, Select, Pagination
 } from '@mantine/core';
 import {

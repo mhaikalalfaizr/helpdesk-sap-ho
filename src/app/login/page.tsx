@@ -1,13 +1,11 @@
 'use client';
 
-import Link from 'next/link';
-
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { notifications } from '@mantine/notifications';
 import {
-  Container, Paper, TextInput, PasswordInput, Button, Title, Text, Stack, Box, Group, Center, Divider, ActionIcon, Tooltip, Anchor
+  Container, Paper, TextInput, PasswordInput, Button, Title, Text, Stack, Box, Group
 } from '@mantine/core';
 import { IconMail, IconLock, IconChecklist, IconAlertCircle } from '@tabler/icons-react';
 
@@ -184,7 +182,7 @@ export default function LoginPage() {
             </Stack>
           </form>
 
-          <Text size="xs" ta="center" mt="xl" c="slateClean.5" fw={500}>
+          {/* <Text size="xs" ta="center" mt="xl" c="slateClean.5" fw={500}>
             Belum memiliki akun?{' '}
             <Anchor
               component={Link}
@@ -195,12 +193,12 @@ export default function LoginPage() {
             >
               Daftar Akun Baru
             </Anchor>
-          </Text>
+          </Text> */}
 
-          <Divider my="xl" labelPosition="center" />
+          {/* <Divider my="xl" labelPosition="center" />
           <Text size="10px" c="dimmed" ta="center">
             Menerapkan enkripsi SSL end-to-end terhubung dengan cloud storage Supabase.
-          </Text>
+          </Text> */}
 
         </Paper>
       </Container>

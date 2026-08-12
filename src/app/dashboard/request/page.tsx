@@ -3,12 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { useMemo } from 'react';
 import { notifications } from '@mantine/notifications';
-import UserDetailDrawer from '../../../components/UserDetailDrawer';
 import {
-  AppShell, SimpleGrid, Paper, Text, Group, Badge, Avatar, Table, NavLink, Stack, Box, Kbd,
-  Tooltip, Modal, Timeline, FileInput, Textarea, Button, TextInput, Select, ActionIcon, Divider, Loader, Center, Drawer
+  Paper, Text, Group, Stack, Box,
+  FileInput, Textarea, Button, TextInput, Select
 } from '@mantine/core';
 import { RequestItem, RequestLog, CategoryOption } from '@/utils/types';
 

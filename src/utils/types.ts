@@ -49,3 +49,14 @@ export interface CategoryRow {
     totalTickets: number;
     averageDays: number;
 }
+
+export interface UserProfile {
+    id: string;
+    full_name: string;
+    email: string;
+    unit_kerja: string | null;
+    division: string | null;
+    role: 'Koordinator' | 'Staf' | 'Pengaju';
+    is_active: boolean;
+    created_at: string;
+}

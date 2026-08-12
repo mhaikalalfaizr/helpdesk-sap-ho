@@ -5,12 +5,11 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { getSlaMetrics, countWorkingDays } from '../../../../utils/helpers';
 import {
-  AppShell, Group, NavLink, Stack, Box, Avatar, ActionIcon,
-  SimpleGrid, Paper, Text, LoadingOverlay, Grid, Center, ThemeIcon, Progress
+  Group, Stack, Box,
+  SimpleGrid, Paper, Text, Grid, Center, ThemeIcon, Progress
 } from '@mantine/core';
 import {
-  IconLayoutDashboard, IconPresentationAnalytics, IconSettings,
-  IconLogout, IconBell, IconChecklist, IconChartBar, IconChartPie
+  IconPresentationAnalytics, IconChartBar, IconChartPie
 } from '@tabler/icons-react';
 import { DonutChart, BarChart, type BarChartProps } from '@mantine/charts';
 import { SlaSegment, PicWorkloadRow, CategoryRow } from '@/utils/types';

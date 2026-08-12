@@ -1,339 +1,345 @@
 'use client';
 
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
-import { notifications } from '@mantine/notifications';
-import {
-  Container, Paper, TextInput, PasswordInput, Button, Title, Text, Stack, Box, Group, Divider, Anchor, Select
-} from '@mantine/core';
-import { IconMail, IconLock, IconChecklist, IconAlertCircle, IconUser, IconBriefcase } from '@tabler/icons-react';
+// import { notFound } from 'next/navigation';
+// import Link from 'next/link';
+// import { useEffect, useState } from 'react';
+// import { useRouter } from 'next/navigation';
+// import { createClient } from '@/lib/supabase/client';
+// import { notifications } from '@mantine/notifications';
+// import {
+//   Container, Paper, TextInput, PasswordInput, Button, Title, Text, Stack, Box, Group, Divider, Anchor, Select
+// } from '@mantine/core';
+// import { IconMail, IconLock, IconChecklist, IconAlertCircle, IconUser, IconBriefcase } from '@tabler/icons-react';
+import NotFoundPage from '../not-found';
 
 export default function RegisterPage() {
-  const router = useRouter();
-  const supabase = createClient();
+  NotFoundPage();
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [fullName, setFullName] = useState('');
+  // const router = useRouter();
+  // const supabase = createClient();
 
-  const [workUnitOptions, setWorkUnitOptions] = useState<{ value: string; label: string }[]>([]);
-  const [divisionOptions, setDivisionOptions] = useState<{ value: string; label: string }[]>([]);
+  // const [email, setEmail] = useState('');
+  // const [password, setPassword] = useState('');
+  // const [confirmPassword, setConfirmPassword] = useState('');
+  // const [fullName, setFullName] = useState('');
 
-  const [workUnit, setWorkUnit] = useState<string | null>('');
-  const [division, setDivision] = useState<string | null>('');
-  const [loading, setLoading] = useState(false);
+  // const [workUnitOptions, setWorkUnitOptions] = useState<{ value: string; label: string }[]>([]);
+  // const [divisionOptions, setDivisionOptions] = useState<{ value: string; label: string }[]>([]);
 
-  useEffect(() => {
-    const fetchWorkUnit = async () => {
-      const { data, error } = await supabase
-        .from('work_unit')
-        .select('id, name');
+  // const [workUnit, setWorkUnit] = useState<string | null>('');
+  // const [division, setDivision] = useState<string | null>('');
+  // const [loading, setLoading] = useState(false);
 
-      if (data) {
-        setWorkUnitOptions(data.map(unit => ({
-          value: unit.id,
-          label: unit.name
-        })));
-      }
-    };
+  // useEffect(() => {
+  //   const fetchWorkUnit = async () => {
+  //     const { data, error } = await supabase
+  //       .from('work_unit')
+  //       .select('id, name');
 
-    fetchWorkUnit();
-  }, []);
+  //     if (data) {
+  //       setWorkUnitOptions(data.map(unit => ({
+  //         value: unit.id,
+  //         label: unit.name
+  //       })));
+  //     }
+  //   };
 
-  useEffect(() => {
-    const fetchDivisions = async () => {
-      if (workUnit === 'Head Office') {
-        const { data, error } = await supabase
-          .from('divisions')
-          .select('code, name')
-          .eq('work_unit_id', 'Head Office');
+  //   fetchWorkUnit();
+  // }, []);
 
-        if (data) {
-          setDivisionOptions(data.map(div => ({
-            value: div.name,
-            label: `${div.code} - ${div.name}`
-          })));
-        }
-      } else {
-        setDivisionOptions([]);
-        setDivision('');
-      }
-    };
+  // useEffect(() => {
+  //   const fetchDivisions = async () => {
+  //     if (workUnit === 'Head Office') {
+  //       const { data, error } = await supabase
+  //         .from('divisions')
+  //         .select('code, name')
+  //         .eq('work_unit_id', 'Head Office');
 
-    fetchDivisions();
-  }, [workUnit]);
+  //       if (data) {
+  //         setDivisionOptions(data.map(div => ({
+  //           value: div.name,
+  //           label: `${div.code} - ${div.name}`
+  //         })));
+  //       }
+  //     } else {
+  //       setDivisionOptions([]);
+  //       setDivision('');
+  //     }
+  //   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  //   fetchDivisions();
+  // }, [workUnit]);
 
-    if (password !== confirmPassword) {
-      notifications.show({
-        title: 'Kata Sandi Tidak Cocok',
-        message: 'Pastikan konfirmasi kata sandi sesuai dengan kata sandi yang Anda masukkan sebelumnya.',
-        color: 'orange',
-        icon: <IconAlertCircle size={16} />
-      });
-      setLoading(false);
-      return;
-    }
+  // const handleRegister = async (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   setLoading(true);
 
-    const allowedDomains = ['@gmail.com', '@sap-ho.my.id'];
-    const isDomainAllowed = allowedDomains.some(domain => email.toLowerCase().endsWith(domain));
+  //   if (password !== confirmPassword) {
+  //     notifications.show({
+  //       title: 'Kata Sandi Tidak Cocok',
+  //       message: 'Pastikan konfirmasi kata sandi sesuai dengan kata sandi yang Anda masukkan sebelumnya.',
+  //       color: 'orange',
+  //       icon: <IconAlertCircle size={16} />
+  //     });
+  //     setLoading(false);
+  //     return;
+  //   }
 
-    if (!isDomainAllowed) {
-      notifications.show({
-        title: 'Akses Ditolak',
-        message: 'Email Anda tidak memiliki akses.',
-        color: 'red',
-        icon: <IconAlertCircle size={16} />
-      });
-      setLoading(false);
-      return;
-    }
+  //   const allowedDomains = ['@gmail.com', '@sap-ho.my.id'];
+  //   const isDomainAllowed = allowedDomains.some(domain => email.toLowerCase().endsWith(domain));
 
-    try {
-      if (!workUnit || (workUnit === 'Head Office' && !division)) {
-        notifications.show({
-          title: 'Data Belum Lengkap',
-          message: 'Harap pilih Unit Kerja dan Divisi Anda.',
-          color: 'orange'
-        });
-        setLoading(false);
-        return;
-      }
+  //   if (!isDomainAllowed) {
+  //     notifications.show({
+  //       title: 'Akses Ditolak',
+  //       message: 'Email Anda tidak memiliki akses.',
+  //       color: 'red',
+  //       icon: <IconAlertCircle size={16} />
+  //     });
+  //     setLoading(false);
+  //     return;
+  //   }
 
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-          }
-        }
-      });
+  //   try {
+  //     if (!workUnit || (workUnit === 'Head Office' && !division)) {
+  //       notifications.show({
+  //         title: 'Data Belum Lengkap',
+  //         message: 'Harap pilih Unit Kerja dan Divisi Anda.',
+  //         color: 'orange'
+  //       });
+  //       setLoading(false);
+  //       return;
+  //     }
 
-      if (authError) throw authError;
+  //     const { data: authData, error: authError } = await supabase.auth.signUp({
+  //       email,
+  //       password,
+  //       options: {
+  //         data: {
+  //           full_name: fullName,
+  //         }
+  //       }
+  //     });
 
-      if (authData.user) {
-        const { error: profileError } = await supabase.from('profiles').insert([
-          {
-            id: authData.user.id,
-            email,
-            full_name: fullName,
-            unit_kerja: workUnit,
-            division: workUnit === 'Head Office' ? division : null,
-            role: 'Pengaju',
-          },
-        ]);
+  //     if (authError) throw authError;
 
-        if (profileError) {
-          throw new Error(`Gagal Simpan Profil: ${profileError.message} (Kode: ${profileError.code})`);
-        }
+  //     if (authData.user) {
+  //       const { error: profileError } = await supabase.from('profiles').insert([
+  //         {
+  //           id: authData.user.id,
+  //           email,
+  //           full_name: fullName,
+  //           unit_kerja: workUnit,
+  //           division: workUnit === 'Head Office' ? division : null,
+  //           role: 'Pengaju',
+  //         },
+  //       ]);
 
-        notifications.show({
-          title: 'Registrasi Hampir Selesai! ✉️',
-          message: 'Tautan verifikasi telah dikirim ke email Anda. Harap cek kotak masuk atau folder spam Anda sebelum mencoba masuk.',
-          color: 'green',
-          autoClose: 8000,
-        });
+  //       if (profileError) {
+  //         throw new Error(`Gagal Simpan Profil: ${profileError.message} (Kode: ${profileError.code})`);
+  //       }
 
-        setEmail('');
-        setPassword('');
-        setConfirmPassword('');
-        setFullName('');
-        setWorkUnit('');
-        setDivision('');
+  //       notifications.show({
+  //         title: 'Registrasi Hampir Selesai! ✉️',
+  //         message: 'Tautan verifikasi telah dikirim ke email Anda. Harap cek kotak masuk atau folder spam Anda sebelum mencoba masuk.',
+  //         color: 'green',
+  //         autoClose: 8000,
+  //       });
 
-        setTimeout(() => {
-          router.push('/login');
-        }, 2000);
-      }
-    } catch (error: any) {
-      notifications.show({
-        title: 'Registrasi Gagal',
-        message: error.message || 'Terjadi kesalahan sistem saat mendaftarkan akun.',
-        color: 'red',
-        icon: <IconAlertCircle size={16} />,
-        autoClose: 5000,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  //       setEmail('');
+  //       setPassword('');
+  //       setConfirmPassword('');
+  //       setFullName('');
+  //       setWorkUnit('');
+  //       setDivision('');
 
-  return (
-    <Box style={{ backgroundColor: '#f8fafc', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }} px="md" suppressHydrationWarning>
-      <Container size={650} w="100%">
-        <Paper p="xl" radius="lg" shadow="md" withBorder style={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0' }}>
+  //       setTimeout(() => {
+  //         router.push('/login');
+  //       }, 2000);
+  //     }
+  //   } catch (error: any) {
+  //     notifications.show({
+  //       title: 'Registrasi Gagal',
+  //       message: error.message || 'Terjadi kesalahan sistem saat mendaftarkan akun.',
+  //       color: 'red',
+  //       icon: <IconAlertCircle size={16} />,
+  //       autoClose: 5000,
+  //     });
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
-          <Stack align="center" gap="xs" mb="xl">
-            <Box bg="ptpn4Green.0" p="xs" style={{ borderRadius: '12px', display: 'flex', alignItems: 'center' }}>
-              <IconChecklist size={32} color="#0e422a" />
-            </Box>
-            <Group gap={4} mt={4}>
-              <Text fw={900} size="24px" lts="tight" c="ptpn4Green.9">{process.env.NEXT_PUBLIC_APP_NAME}</Text>
-            </Group>
-            <Text size="xs" c="dimmed" ta="center" fw={500}>
-              Sistem Pengajuan Dokumen HO
-            </Text>
-          </Stack>
+  // return null;
+  
+  // (
+  //   <Box style={{ backgroundColor: '#f8fafc', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }} px="md" suppressHydrationWarning>
+  //     <Container size={650} w="100%">
+  //       <Paper p="xl" radius="lg" shadow="md" withBorder style={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0' }}>
 
-          <Box mb="lg">
-            <Title order={3} fw={800} c="slateClean.9" ta="left" style={{ letterSpacing: '-0.5px' }}>
-              Daftar Akun Baru
-            </Title>
-            <Text size="xs" c="slateClean.5" ta="left" mt={2}>
-              Lengkapi data di bawah ini untuk mendaftar.
-            </Text>
-          </Box>
+  //         <Stack align="center" gap="xs" mb="xl">
+  //           <Box bg="ptpn4Green.0" p="xs" style={{ borderRadius: '12px', display: 'flex', alignItems: 'center' }}>
+  //             <IconChecklist size={32} color="#0e422a" />
+  //           </Box>
+  //           <Group gap={4} mt={4}>
+  //             <Text fw={900} size="24px" lts="tight" c="ptpn4Green.9">{process.env.NEXT_PUBLIC_APP_NAME}</Text>
+  //           </Group>
+  //           <Text size="xs" c="dimmed" ta="center" fw={500}>
+  //             Sistem Pengajuan Dokumen HO
+  //           </Text>
+  //         </Stack>
 
-          <form onSubmit={handleRegister}>
-            <Stack gap="sm">
-              <TextInput
-                label="Nama Lengkap"
-                placeholder="Masukkan nama lengkap sesuai identitas"
-                required
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                leftSection={<IconUser size={16} stroke={1.5} color="#94a3b8" />}
-                radius="md"
-                styles={{
-                  label: { fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '4px' },
-                  input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }
-                }}
-              />
+  //         <Box mb="lg">
+  //           <Title order={3} fw={800} c="slateClean.9" ta="left" style={{ letterSpacing: '-0.5px' }}>
+  //             Daftar Akun Baru
+  //           </Title>
+  //           <Text size="xs" c="slateClean.5" ta="left" mt={2}>
+  //             Lengkapi data di bawah ini untuk mendaftar.
+  //           </Text>
+  //         </Box>
 
-              <Select
-                label="Unit Kerja"
-                placeholder="Pilih atau cari unit kerja anda"
-                data={workUnitOptions}
-                searchable
-                clearable
-                nothingFoundMessage="Unit kerja tidak ditemukan.."
-                required
-                value={workUnit}
-                onChange={(value) => {
-                  setWorkUnit(value);
-                }}
-                leftSection={<IconBriefcase size={16} stroke={1.5} color="#94a3b8" />}
-                radius="md"
-                styles={{
-                  label: { fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '4px' },
-                  input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' },
-                  dropdown: { backgroundColor: '#ffffff', border: '1px solid #e2e8f0' },
-                  option: {
-                    color: '#1a1a1a',
-                    fontWeight: 500,
-                    '&[dataHovered]': { backgroundColor: '#f1f5f9' },
-                  },
-                }}
-              />
+  //         <form onSubmit={handleRegister}>
+  //           <Stack gap="sm">
+  //             <TextInput
+  //               label="Nama Lengkap"
+  //               placeholder="Masukkan nama lengkap sesuai identitas"
+  //               required
+  //               value={fullName}
+  //               onChange={(e) => setFullName(e.target.value)}
+  //               leftSection={<IconUser size={16} stroke={1.5} color="#94a3b8" />}
+  //               radius="md"
+  //               styles={{
+  //                 label: { fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '4px' },
+  //                 input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }
+  //               }}
+  //             />
 
-              {workUnit === 'Head Office' && (
-                <Select
-                  label="Divisi"
-                  placeholder="Cari atau pilih divisi anda"
-                  data={divisionOptions}
-                  searchable
-                  clearable
-                  nothingFoundMessage="Divisi tidak ditemukan.."
-                  required
-                  value={division}
-                  onChange={setDivision}
-                  leftSection={<IconBriefcase size={16} stroke={1.5} color="#94a3b8" />}
-                  radius="md"
-                  styles={{
-                    label: { fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '4px' },
-                    input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' },
-                    dropdown: { backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }
-                  }}
-                />
-              )}
+  //             <Select
+  //               label="Unit Kerja"
+  //               placeholder="Pilih atau cari unit kerja anda"
+  //               data={workUnitOptions}
+  //               searchable
+  //               clearable
+  //               nothingFoundMessage="Unit kerja tidak ditemukan.."
+  //               required
+  //               value={workUnit}
+  //               onChange={(value) => {
+  //                 setWorkUnit(value);
+  //               }}
+  //               leftSection={<IconBriefcase size={16} stroke={1.5} color="#94a3b8" />}
+  //               radius="md"
+  //               styles={{
+  //                 label: { fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '4px' },
+  //                 input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' },
+  //                 dropdown: { backgroundColor: '#ffffff', border: '1px solid #e2e8f0' },
+  //                 option: {
+  //                   color: '#1a1a1a',
+  //                   fontWeight: 500,
+  //                   '&[dataHovered]': { backgroundColor: '#f1f5f9' },
+  //                 },
+  //               }}
+  //             />
 
-              <TextInput
-                label="Alamat Email"
-                placeholder="nama@email.com"
-                required
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                leftSection={<IconMail size={16} stroke={1.5} color="#94a3b8" />}
-                radius="md"
-                styles={{
-                  label: { fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '4px' },
-                  input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }
-                }}
-              />
+  //             {workUnit === 'Head Office' && (
+  //               <Select
+  //                 label="Divisi"
+  //                 placeholder="Cari atau pilih divisi anda"
+  //                 data={divisionOptions}
+  //                 searchable
+  //                 clearable
+  //                 nothingFoundMessage="Divisi tidak ditemukan.."
+  //                 required
+  //                 value={division}
+  //                 onChange={setDivision}
+  //                 leftSection={<IconBriefcase size={16} stroke={1.5} color="#94a3b8" />}
+  //                 radius="md"
+  //                 styles={{
+  //                   label: { fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '4px' },
+  //                   input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' },
+  //                   dropdown: { backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }
+  //                 }}
+  //               />
+  //             )}
 
-              <Group grow align="flex-start" gap="sm">
-                <PasswordInput
-                  label="Kata Sandi"
-                  placeholder="Minimal 6 karakter"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  leftSection={<IconLock size={16} stroke={1.5} color="#94a3b8" />}
-                  radius="md"
-                  styles={{
-                    label: { fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '4px' },
-                    input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }
-                  }}
-                />
+  //             <TextInput
+  //               label="Alamat Email"
+  //               placeholder="nama@email.com"
+  //               required
+  //               type="email"
+  //               value={email}
+  //               onChange={(e) => setEmail(e.target.value)}
+  //               leftSection={<IconMail size={16} stroke={1.5} color="#94a3b8" />}
+  //               radius="md"
+  //               styles={{
+  //                 label: { fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '4px' },
+  //                 input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }
+  //               }}
+  //             />
 
-                <PasswordInput
-                  label="Konfirmasi Kata Sandi"
-                  placeholder="Ulangi kata sandi"
-                  required
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  leftSection={<IconLock size={16} stroke={1.5} color="#94a3b8" />}
-                  radius="md"
-                  styles={{
-                    label: { fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '4px' },
-                    input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }
-                  }}
-                />
-              </Group>
+  //             <Group grow align="flex-start" gap="sm">
+  //               <PasswordInput
+  //                 label="Kata Sandi"
+  //                 placeholder="Minimal 8 karakter"
+  //                 required
+  //                 value={password}
+  //                 onChange={(e) => setPassword(e.target.value)}
+  //                 leftSection={<IconLock size={16} stroke={1.5} color="#94a3b8" />}
+  //                 radius="md"
+  //                 styles={{
+  //                   label: { fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '4px' },
+  //                   input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }
+  //                 }}
+  //               />
 
-              <Button
-                type="submit"
-                fullWidth
-                loading={loading}
-                mt="md"
-                size="md"
-                radius="md"
-                color="ptpn4Green.9"
-                style={{ fontSize: '14px', fontWeight: 600 }}
-              >
-                Daftar Sekarang
-              </Button>
-            </Stack>
-          </form>
+  //               <PasswordInput
+  //                 label="Konfirmasi Kata Sandi"
+  //                 placeholder="Ulangi kata sandi"
+  //                 required
+  //                 value={confirmPassword}
+  //                 onChange={(e) => setConfirmPassword(e.target.value)}
+  //                 leftSection={<IconLock size={16} stroke={1.5} color="#94a3b8" />}
+  //                 radius="md"
+  //                 styles={{
+  //                   label: { fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '4px' },
+  //                   input: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }
+  //                 }}
+  //               />
+  //             </Group>
 
-          <Text size="xs" ta="center" mt="xl" c="slateClean.5" fw={500}>
-            Sudah memiliki akun?{' '}
-            <Anchor
-              component={Link}
-              href="/login"
-              fw={700}
-              color="ptpn4Green.9"
-              style={{ textDecoration: 'none' }}
-            >
-              Masuk
-            </Anchor>
-          </Text>
+  //             <Button
+  //               type="submit"
+  //               fullWidth
+  //               loading={loading}
+  //               mt="md"
+  //               size="md"
+  //               radius="md"
+  //               color="ptpn4Green.9"
+  //               style={{ fontSize: '14px', fontWeight: 600 }}
+  //             >
+  //               Daftar Sekarang
+  //             </Button>
+  //           </Stack>
+  //         </form>
 
-          <Divider my="xl" labelPosition="center" />
-          <Text size="10px" c="dimmed" ta="center">
-            Menerapkan enkripsi SSL end-to-end terhubung cloud storage Supabase.
-          </Text>
+  //         <Text size="xs" ta="center" mt="xl" c="slateClean.5" fw={500}>
+  //           Sudah memiliki akun?{' '}
+  //           <Anchor
+  //             component={Link}
+  //             href="/login"
+  //             fw={700}
+  //             color="ptpn4Green.9"
+  //             style={{ textDecoration: 'none' }}
+  //           >
+  //             Masuk
+  //           </Anchor>
+  //         </Text>
 
-        </Paper>
-      </Container>
-    </Box>
-  );
+  //         <Divider my="xl" labelPosition="center" />
+  //         <Text size="10px" c="dimmed" ta="center">
+  //           Menerapkan enkripsi SSL end-to-end terhubung cloud storage Supabase.
+  //         </Text>
+
+  //       </Paper>
+  //     </Container>
+  //   </Box>
+  // );
 }

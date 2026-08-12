@@ -1,6 +1,6 @@
 import '@mantine/core/styles.css';
 import '@mantine/charts/styles.css';
-import { ColorSchemeScript, MantineProvider, createTheme } from '@mantine/core';
+import { MantineProvider, createTheme } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import '@mantine/notifications/styles.css';
 import { Metadata } from 'next';
@@ -60,7 +60,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <ColorSchemeScript defaultColorScheme="light" />
       </head>
       <body 
         suppressHydrationWarning 

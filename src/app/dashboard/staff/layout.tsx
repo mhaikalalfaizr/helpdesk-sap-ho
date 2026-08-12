@@ -3,21 +3,25 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { AppShell, Group, Avatar, Box, Text, ActionIcon, Stack, NavLink } from '@mantine/core';
-import { IconLayoutDashboard, IconPresentationAnalytics, IconSettings, IconLogout, IconBell, IconChecklist } from '@tabler/icons-react';
+import { AppShell, Group, Avatar, Box, Text, Stack, NavLink } from '@mantine/core';
+import { IconLayoutDashboard, IconPresentationAnalytics, IconLogout, IconChecklist, IconUsers } from '@tabler/icons-react';
 
 export default function StafLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const supabase = createClient();
   const [currentUserName, setCurrentUserName] = useState('Staf');
+  const [currentUserRole, setCurrentUserRole] = useState<string>('');
 
   useEffect(() => {
     const fetchProfile = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
-        if (data) setCurrentUserName(data.full_name || 'Staf');
+        const { data } = await supabase.from('profiles').select('full_name, role').eq('id', user.id).maybeSingle();
+        if (data) {
+          setCurrentUserName(data.full_name || 'Staf');
+          setCurrentUserRole(data.role || '');
+        }
       }
     };
     fetchProfile();
@@ -44,11 +48,6 @@ export default function StafLayout({ children }: { children: React.ReactNode }) 
               <Text size="sm" fw={600} c="slateClean.9">Halo, {currentUserName}</Text>
               <Text size="xs" c="dimmed">Selamat datang di {process.env.NEXT_PUBLIC_APP_NAME}</Text>
             </Box>
-          </Group>
-          <Group gap="lg" h="100%">
-            <ActionIcon variant="subtle" color="gray" radius="xl" size="lg" style={{ position: 'relative' }}>
-              <IconBell size={20} stroke={1.5} />
-            </ActionIcon>
           </Group>
         </Group>
       </AppShell.Header>
@@ -79,6 +78,20 @@ export default function StafLayout({ children }: { children: React.ReactNode }) 
                 onClick={() => router.push('/dashboard/staff/analytics')}
                 py="sm" style={{ borderRadius: '8px' }}
               />
+
+              {currentUserRole === 'Koordinator' && (
+                <>
+                  <Text size="xs" fw={700} c="slateClean.4" px="sm" mt="xl" mb={4} lts="0.5px">ADMIN</Text>
+                  <NavLink
+                    label="Manajemen Pengguna"
+                    leftSection={<IconUsers size={18} stroke={1.5} />}
+                    active={pathname === '/dashboard/staff/admin'}
+                    onClick={() => router.push('/dashboard/staff/admin')}
+                    py="sm"
+                    style={{ borderRadius: '8px' }}
+                  />
+                </>
+              )}
 
               <Text size="xs" fw={700} c="slateClean.4" px="sm" mt="xl" mb={4} lts="0.5px">SISTEM</Text>
               <NavLink

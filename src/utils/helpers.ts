@@ -1,4 +1,3 @@
-import { notifications } from "@mantine/notifications";
 import { SupabaseClient } from '@supabase/supabase-js';
 import { TICKET_STATUS } from './constants';
 

@@ -17,16 +17,15 @@ import { useStaffRequests } from '@/hooks/useStaffRequests';
 import { RequestItem, RequestLog } from '@/utils/types';
 
 import {
-  AppShell, SimpleGrid, Paper, Text, Group, Badge, Avatar, Table, Menu, ActionIcon, TextInput, NumberInput,
-  NavLink, Stack, Box, Kbd, Tooltip, Modal, Timeline, FileInput, Textarea, Button, Drawer, Divider, Select, Pagination
+  SimpleGrid, Paper, Text, Group, Badge,Table, ActionIcon, TextInput,
+  Stack, Box,Tooltip, Modal, Textarea, Button, Select, Pagination
 } from '@mantine/core';
 import {
-  IconLayoutDashboard, IconFileText, IconClock, IconChecklist, IconSettings, IconLogout, IconSearch, IconBell, IconPencil,
-  IconMail, IconDotsVertical, IconCheck, IconX, IconAlertCircle, IconArrowUpRight, IconDownload, IconEye, IconUserShare,
-  IconPlayerPause, IconPlayerPlay, IconArrowRight, IconFileCheck, IconPresentationAnalytics, IconUser
+  IconSearch, IconX, IconUserShare,
+  IconPlayerPause, IconPlayerPlay, IconArrowRight, IconFileCheck, IconUser
 } from '@tabler/icons-react';
 
-import { getSlaMetrics, countWorkingDays, handleDownloadSecureFile } from '../../../utils/helpers';
+import { countWorkingDays, handleDownloadSecureFile } from '../../../utils/helpers';
 
 export default function PicDashboard() {
   const router = useRouter();

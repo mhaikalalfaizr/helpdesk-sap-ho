@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { AppShell, Group, Avatar, Box, Text, ActionIcon, Stack, NavLink, Badge, Divider } from '@mantine/core';
-import { IconChecklist, IconLogout, IconBell, IconFilePlus, IconHistory } from '@tabler/icons-react';
+import { AppShell, Group, Avatar, Box, Text, Stack, NavLink, Badge, Divider } from '@mantine/core';
+import { IconChecklist, IconLogout, IconFilePlus, IconHistory } from '@tabler/icons-react';
 
 export default function PengajuanLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -49,11 +49,6 @@ export default function PengajuanLayout({ children }: { children: React.ReactNod
               <Text size="sm" fw={600} c="slateClean.9">Halo, {currentUserName}</Text>
               <Text size="xs" c="dimmed">Selamat datang di {process.env.NEXT_PUBLIC_APP_NAME}</Text>
             </Box>
-          </Group>
-          <Group gap="lg" h="100%">
-            <ActionIcon variant="subtle" color="gray" radius="xl" size="lg">
-              <IconBell size={20} stroke={1.5} />
-            </ActionIcon>
           </Group>
         </Group>
       </AppShell.Header>

@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react';
 import { getSlaMetrics, isTicketFinal, isTicketHold, isTicketUnassigned, isTicketInProcess } from '@/utils/helpers';
-import { TICKET_STATUS } from '@/utils/constants';
 
 export function useTableFilters(requests: any[], publicHolidays: string[], currentPicId: string | null) {
     const [searchQuery, setSearchQuery] = useState('');
