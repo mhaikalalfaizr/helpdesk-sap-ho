@@ -98,7 +98,7 @@ export default function UserDetailDrawer({
           )}
 
           {}
-          <Divider my="sm" label={<Text size="10px" fw={700} c="slateClean.4" lts="0.5px">RIWAYAT ALUR DOKUMEN</Text>} labelPosition="center" />
+          <Divider my="sm" label={<Text size="10px" fw={700} c="slateClean.4" lts="0.5px">RIWAYAT STATUS DOKUMEN</Text>} labelPosition="center" />
           {loadingTimeline ? (
             <Text size="xs" ta="center" c="dimmed" py="sm">Mengambil riwayat status dokumen...</Text>
           ) : (
