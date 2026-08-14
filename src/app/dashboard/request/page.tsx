@@ -401,11 +401,13 @@ export default function UserDashboard() {
               }
             };
           }
-
+          
         } catch (emailBlastErr) {
-          console.error('Jaringan terputus saat mengirimkan notifikasi ke Koordinator:', emailBlastErr);
+          console.error('Jaringan terputus saat mengirimkan notifikasi ke Staf:', emailBlastErr);
         }
       }
+
+      router.push('/dashboard/request/history');
 
     } catch (error: any) {
       if (insertedRequestId) {
@@ -453,7 +455,7 @@ export default function UserDashboard() {
       <Box mb="xl">
         <Stack gap="xs">
           <Text size="28px" fw={800} c="slateClean.9" style={{ letterSpacing: '-0.5px' }}>Formulir Pengajuan Dokumen</Text>
-          <Text size="sm" c="dimmed">Isi kelengkapan data pada formulir berikut untuk mengajukan permohonan.</Text>
+          <Text size="sm" c="dimmed">Isi kelengkapan data pada formulir berikut.</Text>
         </Stack>
       </Box>
 
@@ -516,8 +518,8 @@ export default function UserDashboard() {
               radius="md"
             />
             <FileInput
-              label="Unggah Dokumen Pengajuan (.PDF) - Maksimal 5 MB"
-              placeholder={isTiketCategory ? "Opsional (dalam format .PDF) - Maksimal 5 MB" : "Pilih dokumen dari perangkat Anda"}
+              label="Unggah Dokumen Pengajuan (PDF) - Maksimal 5 MB"
+              placeholder={isTiketCategory ? "Opsional (dalam format PDF) - Maksimal 5 MB" : "Pilih dokumen dari perangkat Anda"}
               required={!isTiketCategory}
               withAsterisk={!isTiketCategory}
               value={files}

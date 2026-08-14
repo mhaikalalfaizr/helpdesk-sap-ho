@@ -73,14 +73,16 @@ export default function PengajuanLayout({ children }: { children: React.ReactNod
                 style={{ borderRadius: '8px' }} py="sm"
               />
               <NavLink
-                label="Lacak Status Tiket"
+                label="Riwayat Pengajuan"
                 leftSection={<IconHistory size={18} stroke={1.5} />}
                 active={pathname === '/dashboard/request/history'}
                 onClick={() => router.push('/dashboard/request/history')}
                 style={{ borderRadius: '8px' }} py="sm"
                 rightSection={processCount > 0 ? <Badge size="xs" color="ptpn4Green.9" variant="filled">{processCount}</Badge> : null}
               />
-              <Divider my="sm" />
+              
+
+              <Text size="xs" fw={700} c="slateClean.4" px="sm" mt="xl" mb={4} lts="0.5px">SISTEM</Text>
               <NavLink label="Keluar Aplikasi" leftSection={<IconLogout size={18} stroke={1.5} />} color="red" py="sm" onClick={handleLogout} style={{ borderRadius: '8px' }} />
             </Stack>
           </Box>

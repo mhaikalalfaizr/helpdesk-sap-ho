@@ -17,8 +17,8 @@ import { useStaffRequests } from '@/hooks/useStaffRequests';
 import { RequestItem, RequestLog } from '@/utils/types';
 
 import {
-  SimpleGrid, Paper, Text, Group, Badge,Table, ActionIcon, TextInput,
-  Stack, Box,Tooltip, Modal, Textarea, Button, Select, Pagination
+  SimpleGrid, Paper, Text, Group, Badge, Table, ActionIcon, TextInput,
+  Stack, Box, Tooltip, Modal, Textarea, Button, Select, Pagination
 } from '@mantine/core';
 import {
   IconSearch, IconX, IconUserShare,
@@ -51,6 +51,9 @@ export default function PicDashboard() {
   const [editingSlaId, setEditingSlaId] = useState<string | null>(null);
   const [newSlaValue, setNewSlaValue] = useState<number | ''>('');
   const [isSavingSla, setIsSavingSla] = useState(false);
+
+  const [isProcessingNext, setIsProcessingNext] = useState(false);
+  const [isProcessingHold, setIsProcessingHold] = useState(false);
 
   const {
     currentPicId, currentUserName, currentUserEmail, currentUserRole,
@@ -287,12 +290,39 @@ export default function PicDashboard() {
     }
   };
 
+  const getNextStatusText = (req: RequestItem | null) => {
+    if (!req) return '';
+
+    const isTiketLainnya = req.categories?.name === 'Tiket Lainnya' || req.categories?.id === 4;
+
+    if (isTiketLainnya) {
+      switch (req.status) {
+        case TICKET_STATUS.DIKIRIM: return TICKET_STATUS.PROSES_STAF;
+        case TICKET_STATUS.DITUGASKAN: return TICKET_STATUS.PROSES_STAF;
+        case TICKET_STATUS.PROSES_STAF: return TICKET_STATUS.ELISITASI;
+        case TICKET_STATUS.ELISITASI: return TICKET_STATUS.LAPOR_KONSULTAN;
+        case TICKET_STATUS.LAPOR_KONSULTAN: return TICKET_STATUS.PENGEMBANGAN;
+        case TICKET_STATUS.PENGEMBANGAN: return TICKET_STATUS.UAT;
+        case TICKET_STATUS.UAT: return TICKET_STATUS.RILIS_PRD;
+        default: return 'Tahap Selanjutnya';
+      }
+    } else {
+      switch (req.status) {
+        case TICKET_STATUS.DIKIRIM: return TICKET_STATUS.PROSES_STAF;
+        case TICKET_STATUS.DITUGASKAN: return TICKET_STATUS.PROSES_STAF;
+        case TICKET_STATUS.PROSES_STAF: return TICKET_STATUS.PROSES_HO;
+        case TICKET_STATUS.PROSES_HO: return TICKET_STATUS.PROSES_HOLDING;
+        default: return 'Tahap Selanjutnya';
+      }
+    }
+  };
+
   const handleNextStep = async (req: RequestItem) => {
     let nextStatus: TicketStatus;
 
     if (req.categories?.name === 'Tiket Lainnya' || req.categories?.id === 4) {
       switch (req.status) {
-        case TICKET_STATUS.DIKIRIM: nextStatus = TICKET_STATUS.DITUGASKAN; break;
+        case TICKET_STATUS.DIKIRIM: nextStatus = TICKET_STATUS.PROSES_STAF; break;
         case TICKET_STATUS.DITUGASKAN: nextStatus = TICKET_STATUS.PROSES_STAF; break;
         case TICKET_STATUS.PROSES_STAF: nextStatus = TICKET_STATUS.ELISITASI; break;
         case TICKET_STATUS.ELISITASI: nextStatus = TICKET_STATUS.LAPOR_KONSULTAN; break;
@@ -309,7 +339,7 @@ export default function PicDashboard() {
     }
     else {
       switch (req.status) {
-        case TICKET_STATUS.DIKIRIM: nextStatus = TICKET_STATUS.DITUGASKAN; break;
+        case TICKET_STATUS.DIKIRIM: nextStatus = TICKET_STATUS.PROSES_STAF; break;
         case TICKET_STATUS.DITUGASKAN: nextStatus = TICKET_STATUS.PROSES_STAF; break;
         case TICKET_STATUS.PROSES_STAF: nextStatus = TICKET_STATUS.PROSES_HO; break;
         case TICKET_STATUS.PROSES_HO: nextStatus = TICKET_STATUS.PROSES_HOLDING; break;
@@ -1030,18 +1060,25 @@ export default function PicDashboard() {
       >
         <Stack gap="md">
           <Text size="sm" c="slateClean.7">
-            Anda akan memproses tiket <b>{confirmNextRequest?.ticket_number}</b> ke tahap berikutnya? Tindakan ini tidak dapat dibatalkan.
+            Anda akan memproses tiket <b>{confirmNextRequest?.ticket_number}</b> ke {' '}
+            <b>{getNextStatusText(confirmNextRequest)}</b>? Tindakan ini tidak dapat dibatalkan.
           </Text>
           <Group justify="flex-end" mt="md">
             <Button variant="default" onClick={() => setConfirmNextRequest(null)} radius="md">Batal</Button>
             <Button
               color="green.8"
               radius="md"
+              loading={isProcessingNext}
               onClick={async () => {
                 if (confirmNextRequest) {
-                  const tempReq = confirmNextRequest;
-                  setConfirmNextRequest(null);
-                  await handleNextStep(tempReq);
+                  setIsProcessingNext(true);
+                  try {
+                    const tempReq = confirmNextRequest;
+                    await handleNextStep(tempReq);
+                    setConfirmNextRequest(null);
+                  } finally {
+                    setIsProcessingNext(false);
+                  }
                 }
               }}
             >
@@ -1084,13 +1121,18 @@ export default function PicDashboard() {
             <Button
               color={confirmHoldRequest?.status.startsWith('Sedang Ditangguhkan') ? "green.8" : "orange.8"}
               radius="md"
+              loading={isProcessingHold}
               onClick={async () => {
                 if (confirmHoldRequest) {
-                  const isSuccess = await handleToggleHold(confirmHoldRequest, holdReason);
-
-                  if (isSuccess !== false) {
-                    setConfirmHoldRequest(null);
-                    setHoldReason('');
+                  setIsProcessingHold(true);
+                  try {
+                    const isSuccess = await handleToggleHold(confirmHoldRequest, holdReason);
+                    if (isSuccess !== false) {
+                      setConfirmHoldRequest(null);
+                      setHoldReason('');
+                    }
+                  } finally {
+                    setIsProcessingHold(false);
                   }
                 }
               }}
