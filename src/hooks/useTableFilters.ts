@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { getSlaMetrics, isTicketFinal, isTicketHold, isTicketUnassigned, isTicketInProcess } from '@/utils/helpers';
+import { RequestItem } from '@/utils/types';
 
-export function useTableFilters(requests: any[], publicHolidays: string[], currentPicId: string | null) {
+export function useTableFilters(requests: RequestItem[], publicHolidays: string[], currentPicId: string | null) {
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState<string | null>(null);
     const [urgencyFilter, setUrgencyFilter] = useState<string | null>(null);
@@ -70,7 +71,7 @@ export function useTableFilters(requests: any[], publicHolidays: string[], curre
         if (!sortKey || !sortDirection) return filtered;
 
         return [...filtered].sort((a, b) => {
-            let valA: any = ''; let valB: any = '';
+            let valA: string | number = ''; let valB: string | number = '';
 
             if (sortKey === 'ticket') { valA = a.ticket_number; valB = b.ticket_number; }
             else if (sortKey === 'applicant') { valA = a.profiles?.full_name || ''; valB = b.profiles?.full_name || ''; }

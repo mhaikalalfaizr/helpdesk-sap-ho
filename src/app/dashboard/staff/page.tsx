@@ -168,13 +168,10 @@ export default function PicDashboard() {
               },
               body: JSON.stringify({
                 ticketNumber: assignRequest.ticket_number,
-                title: assignRequest.request_title,
                 status: payload.recipientEmail === assignRequest.profiles?.email
                   ? 'Pembaruan Penanggung Jawab'
                   : 'Tugas Baru Dialokasikan',
-                notes: payload.notes,
-                recipientEmail: payload.recipientEmail,
-                recipientName: payload.recipientName
+                notes: payload.notes
               }),
             });
 
@@ -255,11 +252,8 @@ export default function PicDashboard() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               ticketNumber: targetRequest.ticket_number,
-              title: targetRequest.request_title,
               status: logStatusName,
-              notes: notes,
-              recipientEmail: targetRequest.profiles?.email,
-              recipientName: targetRequest.profiles?.full_name
+              notes: notes
             }),
           });
 
@@ -507,11 +501,8 @@ export default function PicDashboard() {
             },
             body: JSON.stringify({
               ticketNumber: req.ticket_number,
-              title: req.request_title,
               status: nextStatus,
-              notes: notes,
-              recipientEmail: req.profiles?.email,
-              recipientName: req.profiles?.full_name
+              notes: notes
             }),
           });
 
@@ -545,11 +536,8 @@ export default function PicDashboard() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             ticketNumber: req.ticket_number,
-            title: req.request_title,
             status: nextStatus,
-            notes: 'Penangguhan pada pengajuan Anda telah dilepas. Proses kembali berjalan normal.',
-            recipientEmail: req.profiles?.email,
-            recipientName: req.profiles?.full_name
+            notes: 'Penangguhan pada pengajuan Anda telah dilepas. Proses kembali berjalan normal.'
           }),
         });
       } catch (e) {

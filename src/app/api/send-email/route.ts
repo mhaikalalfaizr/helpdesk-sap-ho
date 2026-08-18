@@ -29,11 +29,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Akses Ditolak: Sesi tidak valid' }, { status: 401 });
     }
 
-    const { ticketNumber, title, status, notes, recipientEmail, recipientName } = await request.json();
+    const { ticketNumber, status, notes } = await request.json();
 
     const { data: ticket, error: ticketError } = await supabase
       .from('requests')
-      .select('id, request_title')
+      .select('id, request_title, user_id, profiles:user_id(email, full_name)')
       .eq('ticket_number', ticketNumber)
       .single();
 
@@ -41,9 +41,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Akses Ditolak: Tiket tidak valid atau tidak diizinkan.' }, { status: 403 });
     }
 
-    if (!recipientEmail || !ticketNumber || !title || !status || !recipientName) {
+    const recipientEmail = (ticket.profiles as any)?.email;
+    const recipientName = (ticket.profiles as any)?.full_name || 'Pengaju';
+    const title = ticket.request_title;
+
+    if (!recipientEmail || !ticketNumber || !title || !status) {
       return NextResponse.json(
-        { error: 'Data tidak lengkap. Pastikan email, nama, nomor tiket, judul, dan status terisi.' },
+        { error: 'Data tiket tidak lengkap di database. Pastikan profil pengaju memiliki email.' },
         { status: 400 }
       );
     }
