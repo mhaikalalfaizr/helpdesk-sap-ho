@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { AppShell, Group, Avatar, Box, Text, Stack, NavLink } from '@mantine/core';
+import BellNotification from '@/components/BellNotification';
 import { IconLayoutDashboard, IconPresentationAnalytics, IconLogout, IconChecklist, IconUsers } from '@tabler/icons-react';
 
 export default function StafLayout({ children }: { children: React.ReactNode }) {
@@ -12,11 +13,13 @@ export default function StafLayout({ children }: { children: React.ReactNode }) 
   const supabase = createClient();
   const [currentUserName, setCurrentUserName] = useState('Staf');
   const [currentUserRole, setCurrentUserRole] = useState<string>('');
+  const [currentUserId, setCurrentUserId] = useState<string>('');
 
   useEffect(() => {
     const fetchProfile = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        setCurrentUserId(user.id);
         const { data } = await supabase.from('profiles').select('full_name, role').eq('id', user.id).maybeSingle();
         if (data) {
           setCurrentUserName(data.full_name || 'Staf');
@@ -42,13 +45,19 @@ export default function StafLayout({ children }: { children: React.ReactNode }) 
       <AppShell.Header bg="white" px="xl" style={{ borderBottom: '1px solid rgba(226, 232, 240, 0.8)' }}>
         <Group justify="space-between" h="100%">
           <Group gap="lg" h="100%">
-            <Avatar src={null} alt="Staf Monitor" color="ptpn4Green.9" radius="xl">Staf
+
+            <Avatar src={null} alt="Dasbor Staf" color="ptpn4Green.9" radius="xl">Staf
             </Avatar>
             <Box>
               <Text size="sm" fw={600} c="slateClean.9">Halo, {currentUserName}</Text>
               <Text size="xs" c="dimmed">Selamat datang di {process.env.NEXT_PUBLIC_APP_NAME}</Text>
             </Box>
           </Group>
+
+          {currentUserId && currentUserRole && (
+              <BellNotification userId={currentUserId} role={currentUserRole} />
+            )}
+
         </Group>
       </AppShell.Header>
 

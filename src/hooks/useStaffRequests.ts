@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { RequestItem } from '@/utils/types';
 
 export function useStaffRequests() {
     const router = useRouter();
@@ -11,7 +12,7 @@ export function useStaffRequests() {
     const [currentUserName, setCurrentUserName] = useState('Staf');
     const [currentUserEmail, setCurrentUserEmail] = useState('');
     const [currentUserRole, setCurrentUserRole] = useState<string>('');
-    const [requests, setRequests] = useState<any[]>([]);
+    const [requests, setRequests] = useState<RequestItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [picList, setPicList] = useState<{ value: string; label: string; email: string }[]>([]);
     const [publicHolidays, setPublicHolidays] = useState<string[]>([]);
@@ -58,8 +59,8 @@ export function useStaffRequests() {
         if (data) {
             setRequests(prev => {
                 const exists = prev.find(r => r.id === requestId);
-                if (exists) return prev.map(r => r.id === requestId ? (data as any) : r);
-                return [data as any, ...prev];
+                if (exists) return prev.map(r => r.id === requestId ? (data as unknown as RequestItem) : r);
+                return [data as unknown as RequestItem, ...prev];
             });
         }
     };
@@ -107,7 +108,7 @@ export function useStaffRequests() {
                 alert("Gagal narik tiket! Cek Console Browser!");
             }
 
-            if (data) setRequests(data as any);
+            if (data) setRequests(data as unknown as RequestItem[]);
 
             const { data: allPics } = await supabase
                 .from('profiles')

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { AppShell, Group, Avatar, Box, Text, Stack, NavLink, Badge, Divider } from '@mantine/core';
+import BellNotification from '@/components/BellNotification';
 import { IconChecklist, IconLogout, IconFilePlus, IconHistory } from '@tabler/icons-react';
 
 export default function PengajuanLayout({ children }: { children: React.ReactNode }) {
@@ -11,14 +12,20 @@ export default function PengajuanLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const supabase = createClient();
   const [currentUserName, setCurrentUserName] = useState('Pengaju');
+  const [currentUserRole, setCurrentUserRole] = useState<string>('');
   const [processCount, setProcessCount] = useState(0);
+  const [currentUserId, setCurrentUserId] = useState<string>('');
 
   useEffect(() => {
     const initLayout = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
-        if (profile) setCurrentUserName(profile.full_name || 'Pengaju');
+        setCurrentUserId(user.id);
+        const { data: profile } = await supabase.from('profiles').select('full_name, role').eq('id', user.id).maybeSingle();
+        if (profile) {
+          setCurrentUserName(profile.full_name || 'Pengaju');
+          setCurrentUserRole(profile.role || 'Pengaju');
+        }
 
         const { count } = await supabase
           .from('requests')
@@ -50,6 +57,9 @@ export default function PengajuanLayout({ children }: { children: React.ReactNod
               <Text size="xs" c="dimmed">Selamat datang di {process.env.NEXT_PUBLIC_APP_NAME}</Text>
             </Box>
           </Group>
+            {currentUserId && currentUserRole && (
+                <BellNotification userId={currentUserId} role={currentUserRole} />
+              )}
         </Group>
       </AppShell.Header>
 

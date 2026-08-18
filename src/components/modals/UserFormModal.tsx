@@ -166,47 +166,47 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
     const cleanDivision = cleanUnitKerja === 'Head Office' ? division?.trim() || '' : '-';
 
     if (!cleanName) {
-      notifications.show({ title: 'Validasi Gagal', message: 'Nama lengkap wajib diisi.', color: 'red' });
+      notifications.show({ title: 'Data Belum Lengkap', message: 'Nama lengkap wajib diisi.', color: 'red' });
       return;
     }
 
     if (!isEditMode && !cleanEmail) {
-      notifications.show({ title: 'Validasi Gagal', message: 'Email wajib diisi.', color: 'red' });
+      notifications.show({ title: 'Data Belum Lengkap', message: 'Email wajib diisi.', color: 'red' });
       return;
     }
 
     if (!cleanUnitKerja) {
-      notifications.show({ title: 'Validasi Gagal', message: 'Unit kerja wajib dipilih.', color: 'red' });
+      notifications.show({ title: 'Data Belum Lengkap', message: 'Unit kerja wajib dipilih.', color: 'red' });
       return;
     }
 
     if (cleanUnitKerja === 'Head Office' && !cleanDivision) {
-      notifications.show({ title: 'Validasi Gagal', message: 'Divisi wajib dipilih untuk Head Office.', color: 'red' });
+      notifications.show({ title: 'Data Belum Lengkap', message: 'Divisi wajib dipilih untuk Head Office.', color: 'red' });
       return;
     }
 
     if (!isEditMode && password.length < 8) {
-      notifications.show({ title: 'Validasi Gagal', message: 'Kata sandi minimal 8 karakter.', color: 'red' });
+      notifications.show({ title: 'Data Belum Lengkap', message: 'Kata sandi minimal 8 karakter.', color: 'red' });
       return;
     }
 
     if (!isEditMode && password !== confirmPassword) {
-      notifications.show({ title: 'Validasi Gagal', message: 'Konfirmasi kata sandi tidak cocok.', color: 'red' });
+      notifications.show({ title: 'Data Belum Lengkap', message: 'Konfirmasi kata sandi tidak cocok.', color: 'red' });
       return;
     }
 
     if (isEditMode && newPassword && newPassword.length < 8) {
-      notifications.show({ title: 'Validasi Gagal', message: 'Kata sandi baru minimal 8 karakter.', color: 'red' });
+      notifications.show({ title: 'Data Belum Lengkap', message: 'Kata sandi baru minimal 8 karakter.', color: 'red' });
       return;
     }
 
     if (isEditMode && newPassword && newPassword !== confirmNewPassword) {
-      notifications.show({ title: 'Validasi Gagal', message: 'Konfirmasi kata sandi baru tidak cocok.', color: 'red' });
+      notifications.show({ title: 'Data Belum Lengkap', message: 'Konfirmasi kata sandi baru tidak cocok.', color: 'red' });
       return;
     }
 
     if (!role) {
-      notifications.show({ title: 'Validasi Gagal', message: 'Role wajib dipilih.', color: 'red' });
+      notifications.show({ title: 'Data Belum Lengkap', message: 'Role wajib dipilih.', color: 'red' });
       return;
     }
 
@@ -252,7 +252,7 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
         });
 
         notifications.show({
-          title: 'Berhasil',
+          title: 'Pembaruan Berhasil',
           message: `Profil ${cleanName} berhasil diperbarui.`,
           color: 'green',
         });
@@ -273,7 +273,7 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
         const json = await res.json();
 
         if (!res.ok) {
-          throw new Error(json.error || 'Gagal membuat user baru.');
+          throw new Error(json.error || 'Gagal membuat akun pengguna baru.');
         }
 
         onSuccess({
@@ -288,7 +288,7 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
         });
 
         notifications.show({
-          title: 'User Ditambahkan',
+          title: 'Pengguna Ditambahkan',
           message: `Akun untuk ${cleanName} berhasil dibuat.`,
           color: 'green',
         });
@@ -408,7 +408,7 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
           <>
             <TextInput
               label="Kata Sandi Baru"
-              placeholder="Kosongkan jika tidak ingin mengubah password"
+              placeholder="Kosongkan jika tidak ingin mengubah kata sandi"
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.currentTarget.value)}
@@ -434,8 +434,8 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
         )}
 
         <Select
-          label="Role"
-          placeholder="Pilih role"
+          label="Peran"
+          placeholder="Pilih peran pengguna"
           data={ROLE_OPTIONS}
           value={role}
           onChange={setRole}
@@ -447,7 +447,7 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
         <Group justify="flex-end" gap="sm" mt="sm">
           <Button variant="default" size="sm" radius="md" onClick={onClose} disabled={loading}>Batal</Button>
           <Button color="ptpn4Green" size="sm" radius="md" onClick={handleSubmit} loading={loading}>
-            {isEditMode ? 'Simpan Perubahan' : 'Tambah User'}
+            {isEditMode ? 'Simpan Perubahan' : 'Tambah Pengguna'}
           </Button>
         </Group>
       </Stack>

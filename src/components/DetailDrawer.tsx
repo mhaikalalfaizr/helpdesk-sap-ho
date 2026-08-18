@@ -124,16 +124,16 @@ export default function DetailDrawer({
           </Box>
 
           { }
-          {detail.attachments && detail.attachments.filter((a: any) => a.type === 'Dokumen_Awal').length > 0 ? (
+          {detail.attachments && detail.attachments.filter((a) => a.type === 'Dokumen_Awal').length > 0 ? (
             <Box>
               <Text size="xs" c="dimmed" fw={600} mb={4}>
-                LAMPIRAN DOKUMEN AWAL ({detail.attachments.filter((a: any) => a.type === 'Dokumen_Awal').length} Dokumen)
+                LAMPIRAN DOKUMEN AWAL ({detail.attachments.filter((a) => a.type === 'Dokumen_Awal').length} Dokumen)
               </Text>
               <Stack gap="xs">
-                {detail.attachments.filter((att: any) => att.type === 'Dokumen_Awal').map((file: any, idx: number) => (
+                {detail.attachments.filter((att) => att.type === 'Dokumen_Awal').map((file, idx: number) => (
                   <Button
                     key={file.id || idx}
-                    onClick={() => onDownload(file.file_url, file.file_name)}
+                    onClick={() => onDownload(file.file_url, file.file_name || 'Dokumen')}
                     variant="outline" color="ptpn4Green.9" fullWidth leftSection={<IconDownload size={16} />}
                     styles={{ inner: { justifyContent: 'flex-start' } }}
                   >
@@ -167,7 +167,7 @@ export default function DetailDrawer({
                   .map((file: any, idx: number) => (
                     <Button
                       key={file.id || idx}
-                      onClick={() => onDownload(file.file_url, file.file_name)}
+                      onClick={() => onDownload(file.file_url, file.file_name || 'Dokumen')}
                       variant="filled" color="ptpn4Green.9" fullWidth leftSection={<IconDownload size={16} />}
                       styles={{ inner: { justifyContent: 'flex-start' } }}
                     >

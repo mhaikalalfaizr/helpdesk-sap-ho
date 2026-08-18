@@ -1,9 +1,10 @@
 import { Drawer, Group, Badge, Text, Stack, Box, Paper, Button, Divider, Timeline, Tooltip, ActionIcon } from '@mantine/core';
 import { IconDownload } from '@tabler/icons-react';
+import { RequestItem, RequestLog } from '@/utils/types';
 
 interface UserDetailDrawerProps {
-  request: any;
-  historyLogs: any[];
+  request: RequestItem | null;
+  historyLogs: RequestLog[];
   loadingTimeline: boolean;
   onClose: () => void;
   onDownload: (url: string, fileName: string) => void;
@@ -54,14 +55,14 @@ export default function UserDetailDrawer({
           {request.attachments && request.attachments.length > 0 && (
             <>
               <Box>
-                <Text size="xs" c="dimmed" fw={600} mb={4}>LAMPIRAN DOKUMEN AWAL ({request.attachments.filter((a: any) => a.type === 'Dokumen_Awal').length} Berkas)</Text>
+                <Text size="xs" c="dimmed" fw={600} mb={4}>LAMPIRAN DOKUMEN AWAL ({request.attachments.filter((a) => a.type === 'Dokumen_Awal').length} Berkas)</Text>
                 <Stack gap="xs">
                   {request.attachments
-                    .filter((att: any) => att.type === 'Dokumen_Awal')
-                    .map((file: any, idx: number) => (
+                    .filter((att) => att.type === 'Dokumen_Awal')
+                    .map((file, idx) => (
                           <Button
                           key={file.id || idx}
-                          onClick={() => onDownload(file.file_url, file.file_name)}
+                          onClick={() => onDownload(file.file_url, file.file_name || 'Dokumen')}
                           variant="outline" color="ptpn4Green.9" fullWidth leftSection={<IconDownload size={16} />}
                           styles={{ inner: { justifyContent: 'flex-start' } }}
                         >
@@ -73,16 +74,16 @@ export default function UserDetailDrawer({
                 </Stack>
               </Box>
 
-              {request.attachments.some((a: any) => a.type === 'Dokumen_Final') && (
+              {request.attachments.some((a) => a.type === 'Dokumen_Final') && (
                 <Box mt="sm">
-                  <Text size="xs" c="ptpn4Green.9" fw={800} mb={4}>LAMPIRAN DOKUMEN FINAL ({request.attachments.filter((a: any) => a.type === 'Dokumen_Final').length} Berkas)</Text>
+                  <Text size="xs" c="ptpn4Green.9" fw={800} mb={4}>LAMPIRAN DOKUMEN FINAL ({request.attachments.filter((a) => a.type === 'Dokumen_Final').length} Berkas)</Text>
                   <Stack gap="xs">
                     {request.attachments
-                      .filter((att: any) => att.type === 'Dokumen_Final')
-                      .map((file: any, idx: number) => (
+                      .filter((att) => att.type === 'Dokumen_Final')
+                      .map((file, idx) => (
                           <Button
                         key={file.id || idx}
-                        onClick={() => onDownload(file.file_url, file.file_name)}
+                        onClick={() => onDownload(file.file_url, file.file_name || 'Dokumen')}
                         variant="filled" color="ptpn4Green.9" fullWidth leftSection={<IconDownload size={16} />}
                         styles={{ inner: { justifyContent: 'flex-start' } }}
                       >

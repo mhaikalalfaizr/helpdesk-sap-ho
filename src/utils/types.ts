@@ -24,7 +24,7 @@ export interface RequestItem {
     categories?: { id: number; name: string; sla_days: number };
     sub_categories?: { name: string; sla_days: number };
     pic?: { full_name: string } | null;
-    attachments?: { id: string; file_url: string; type: string }[];
+    attachments?: { id: string; file_url: string; type: string; file_name?: string }[];
     profiles: { full_name: string; unit_kerja: string; division: string; email?: string } | null;
 }
 

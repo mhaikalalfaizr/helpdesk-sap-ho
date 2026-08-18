@@ -192,6 +192,10 @@ export default function UserDashboard() {
       else if (sortKey === 'title') { valA = a.request_title?.toLowerCase() || ''; valB = b.request_title?.toLowerCase() || ''; }
       else if (sortKey === 'date') { valA = new Date(a.created_at).getTime(); valB = new Date(b.created_at).getTime(); }
       else if (sortKey === 'status') { valA = a.status; valB = b.status; }
+      else if (sortKey === 'duration') { 
+        valA = parseInt(getSlaMetrics(a.created_at, a.status, a.total_hold_days, 7, a.updated_at, publicHolidays).displayString.replace(/[^0-9]/g, '')) || 0; 
+        valB = parseInt(getSlaMetrics(b.created_at, b.status, b.total_hold_days, 7, b.updated_at, publicHolidays).displayString.replace(/[^0-9]/g, '')) || 0; 
+      }
 
       if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
       if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
@@ -354,8 +358,8 @@ export default function UserDashboard() {
                 <Table.Th style={{ cursor: 'pointer' }} w="20%" onClick={() => handleSortRequest('title')}>
                   <Text size="xs" fw={700} c="slateClean.5">JUDUL / JENIS{renderSortArrow('title')}</Text>
                 </Table.Th>
-                <Table.Th w="10%">
-                  <Text size="xs" fw={700} c="slateClean.5">DURASI</Text>
+                <Table.Th style={{ cursor: 'pointer' }} w="10%" onClick={() => handleSortRequest('duration')}>
+                  <Text size="xs" fw={700} c="slateClean.5">DURASI{renderSortArrow('duration')}</Text>
                 </Table.Th>
                 <Table.Th style={{ cursor: 'pointer' }} w="12%" onClick={() => handleSortRequest('date')}>
                   <Text size="xs" fw={700} c="slateClean.5">TANGGAL KIRIM{renderSortArrow('date')}</Text>

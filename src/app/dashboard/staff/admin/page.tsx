@@ -88,7 +88,7 @@ export default function UserManagementPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Gagal mengubah status pengguna.');
       setUsers((prev) => prev.map((user) => user.id === confirmToggleUser.id ? { ...user, is_active: newStatus } : user));
-      notifications.show({ title: 'Berhasil', message: `${confirmToggleUser.full_name} berhasil ${newStatus ? 'diaktifkan' : 'dinonaktifkan'}.`, color: newStatus ? 'green' : 'orange', autoClose: 4000 });
+      notifications.show({ title: 'Berhasil', message: `Akun ${confirmToggleUser.full_name} berhasil ${newStatus ? 'diaktifkan' : 'dinonaktifkan'}.`, color: newStatus ? 'green' : 'orange', autoClose: 4000 });
       setConfirmToggleUser(null);
     } catch (err: any) {
       notifications.show({ title: 'Gagal', message: err?.message || 'Terjadi kesalahan saat mengubah status pengguna.', color: 'red', autoClose: 5000 });
@@ -139,7 +139,7 @@ export default function UserManagementPage() {
                   onChange={(e) => setSearchQuery(e.currentTarget.value)}
                   style={{ width: '300px' }}
                 />
-                <Select placeholder="Semua Jabatan" data={ROLE_OPTIONS} value={roleFilter} onChange={setRoleFilter} clearable w={{ base: '100%', sm: 200 }} styles={selectStyles} />
+                <Select placeholder="Semua Peran" data={ROLE_OPTIONS} value={roleFilter} onChange={setRoleFilter} clearable w={{ base: '100%', sm: 200 }} styles={selectStyles} />
                 <Select placeholder="Semua Status" data={STATUS_OPTIONS} value={statusFilter} onChange={setStatusFilter} clearable w={{ base: '100%', sm: 200 }} styles={selectStyles} />
                 {hasFilter && (
                   <Button variant="light" color="gray" size="sm" radius="md" leftSection={<IconX size={14} />} onClick={() => { setRoleFilter(null); setStatusFilter(null); }}>Hapus Filter</Button>
@@ -216,13 +216,13 @@ export default function UserManagementPage() {
         <Stack gap="md">
           <Text size="sm" c="slateClean.7">
             {confirmToggleUser?.is_active
-              ? <>Anda akan menonaktifkan akun <b>{confirmToggleUser?.full_name}</b>. Pengguna tidak akan dapat login sampai diaktifkan kembali. Data dan riwayat tiket mereka tetap tersimpan.</>
-              : <>Anda akan mengaktifkan kembali akun <b>{confirmToggleUser?.full_name}</b>. Pengguna akan dapat login seperti biasa.</>}
+              ? <>Anda akan menonaktifkan akun <b>{confirmToggleUser?.full_name}</b>. Pengguna tidak akan dapat masuk sampai diaktifkan kembali. Data dan riwayat tiket mereka tetap tersimpan.</>
+              : <>Anda akan mengaktifkan kembali akun <b>{confirmToggleUser?.full_name}</b>. Pengguna akan dapat masuk seperti biasa.</>}
           </Text>
           <Group justify="flex-end" mt="md">
             <Button variant="default" onClick={() => setConfirmToggleUser(null)} radius="md" disabled={isToggling}>Batal</Button>
             <Button color={confirmToggleUser?.is_active ? 'orange.8' : 'green.8'} radius="md" onClick={handleToggleConfirm} loading={isToggling}>
-              {confirmToggleUser?.is_active ? 'Ya, Nonaktifkan' : 'Ya, Aktifkan'}
+              {confirmToggleUser?.is_active ? 'Konfirmasi' : 'Konfirmasi'}
             </Button>
           </Group>
         </Stack>

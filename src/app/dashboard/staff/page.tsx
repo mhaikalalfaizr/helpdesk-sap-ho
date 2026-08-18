@@ -31,7 +31,7 @@ export default function PicDashboard() {
   const router = useRouter();
   const [supabase] = useState(() => createClient());
 
-  const [finalUploadRequest, setFinalUploadRequest] = useState<any | null>(null);
+  const [finalUploadRequest, setFinalUploadRequest] = useState<RequestItem | null>(null);
 
   const [selectedRequest, setSelectedRequest] = useState<RequestItem | null>(null);
   const [historyLogs, setHistoryLogs] = useState<RequestLog[]>([]);
@@ -88,7 +88,7 @@ export default function PicDashboard() {
       .eq('request_id', req.id)
       .order('created_at', { ascending: true });
 
-    if (data) setHistoryLogs(data as any);
+    if (data) setHistoryLogs(data as unknown as RequestLog[]);
     setLoadingTimeline(false);
   };
 
@@ -105,7 +105,7 @@ export default function PicDashboard() {
       .eq('request_id', req.id)
       .order('created_at', { ascending: true });
 
-    if (data) setHistoryLogs(data as any);
+    if (data) setHistoryLogs(data as unknown as RequestLog[]);
     setLoadingTimeline(false);
   };
 
@@ -201,13 +201,13 @@ export default function PicDashboard() {
         color: 'green'
       });
 
-    } catch (err: any) {
-      notifications.show({ title: 'Gagal Mengalihkan Penugasan Tiket', message: err.message, color: 'red' });
+    } catch (err: unknown) {
+      notifications.show({ title: 'Gagal Mengalihkan Penugasan Tiket', message: (err instanceof Error ? err.message : (typeof err === 'object' && err !== null && 'message' in err ? String((err as any).message) : String(err))), color: 'red' });
       throw err;
     }
   };
 
-  const updateDatabaseStatus = async (id: string, payload: any, logStatusName: TicketStatus, notes: string = 'Sinkronisasi status oleh Staf') => {
+  const updateDatabaseStatus = async (id: string, payload: Partial<RequestItem>, logStatusName: TicketStatus, notes: string = 'Sinkronisasi status oleh Staf') => {
     try {
       const targetRequest = requests.find(r => r.id === id);
 
@@ -280,7 +280,7 @@ export default function PicDashboard() {
       });
 
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Terjadi kesalahan.';
+      const message = err instanceof Error ? err.message : (typeof err === 'object' && err !== null && 'message' in err ? String((err as any).message) : String(err));
       notifications.show({
         title: 'Sistem Gagal Memperbarui',
         message: message,
@@ -372,8 +372,8 @@ export default function PicDashboard() {
         setSelectedDetail({ ...selectedDetail, custom_sla_days: Number(newSlaValue) });
       }
 
-    } catch (error: any) {
-      notifications.show({ title: 'Gagal Update', message: error.message, color: 'red' });
+    } catch (error: unknown) {
+      notifications.show({ title: 'Gagal Update', message: (error instanceof Error ? error.message : (typeof error === 'object' && error !== null && 'message' in error ? String((error as any).message) : String(error))), color: 'red' });
     } finally {
       setIsSavingSla(false);
     }
@@ -455,7 +455,7 @@ export default function PicDashboard() {
       setFinalUploadRequest(null);
 
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Terjadi kesalahan.';
+      const message = err instanceof Error ? err.message : (typeof err === 'object' && err !== null && 'message' in err ? String((err as any).message) : String(err));
       notifications.show({ title: 'Gagal Mengunggah Dokumen Final', message: message, color: 'red' });
       throw err;
     }
@@ -530,8 +530,8 @@ export default function PicDashboard() {
           color: 'orange',
         });
 
-      } catch (err: any) {
-        notifications.show({ title: 'Eror Supabase (Hold)', message: err.message, color: 'red' });
+      } catch (err: unknown) {
+        notifications.show({ title: 'Eror Supabase (Hold)', message: (err instanceof Error ? err.message : (typeof err === 'object' && err !== null && 'message' in err ? String((err as any).message) : String(err))), color: 'red' });
       }
 
     } else if (req.status.startsWith('Sedang Ditangguhkan di')) {
@@ -617,8 +617,8 @@ export default function PicDashboard() {
           color: 'green',
         });
 
-      } catch (err: any) {
-        notifications.show({ title: 'Eror Supabase (Unhold)', message: err.message, color: 'red' });
+      } catch (err: unknown) {
+        notifications.show({ title: 'Eror Supabase (Unhold)', message: (err instanceof Error ? err.message : (typeof err === 'object' && err !== null && 'message' in err ? String((err as any).message) : String(err))), color: 'red' });
       }
     }
   };
@@ -633,8 +633,8 @@ export default function PicDashboard() {
         `Alasan Penolakan: ${reason}`
       );
       setRejectRequest(null);
-    } catch (err: any) {
-      alert(`Gagal menolak dokumen: ${err.message}`);
+    } catch (err: unknown) {
+      alert(`Gagal menolak dokumen: ${(err instanceof Error ? err.message : (typeof err === 'object' && err !== null && 'message' in err ? String((err as any).message) : String(err)))}`);
       throw err;
     }
   };
@@ -711,7 +711,6 @@ export default function PicDashboard() {
           <Text size="36px" fw={800} my="xs" c="slateClean.9">{loading ? '...' : holdCount}</Text>
           <Text size="xs" c="orange.6" fw={500}>Penangguhan aktif</Text>
         </Paper>
-
 
         <Paper
           p="xl"
@@ -955,7 +954,8 @@ export default function PicDashboard() {
                                 </Badge>
                               ) : (
                                 <>
-                                  <Tooltip label={req.status === TICKET_STATUS.PROSES_HOLDING ? 'Upload Dokumen Akhir & Setujui Pengajuan' : 'Lanjutkan proses ke tahap berikutnya'} position="top" withArrow>
+                                  <Tooltip label={req.status === TICKET_STATUS.PROSES_HOLDING ? 'Upload Dokumen Akhir & Setujui Pengajuan'
+                                  : req.status === TICKET_STATUS.UAT ? 'Selesaikan Pengajuan' : 'Lanjutkan proses ke tahap berikutnya'} position="top" withArrow>
                                     <ActionIcon
                                       size="md"
                                       variant="light"
@@ -969,7 +969,7 @@ export default function PicDashboard() {
                                         }
                                       }}
                                     >
-                                      {req.status === TICKET_STATUS.PROSES_HOLDING ? <IconFileCheck size={18} /> : <IconArrowRight size={18} />}
+                                      {req.status === TICKET_STATUS.PROSES_HOLDING || req.status === TICKET_STATUS.UAT ? <IconFileCheck size={18} /> : <IconArrowRight size={18} />}
                                     </ActionIcon>
                                   </Tooltip>
 
