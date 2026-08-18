@@ -56,7 +56,7 @@ export async function POST(request: Request) {
 
     if (!full_name || !email || !password || !unit_kerja || !role) {
       return NextResponse.json(
-        { error: 'Nama, email, password, unit kerja, dan role wajib diisi.' },
+        { error: 'Nama, email, kata sandi, unit kerja, dan role wajib diisi.' },
         { status: 400 }
       );
     }
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
 
     if (password.length < 8) {
       return NextResponse.json(
-        { error: 'Password minimal 8 karakter.' },
+        { error: 'Kata sandi minimal 8 karakter.' },
         { status: 400 }
       );
     }
