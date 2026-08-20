@@ -101,7 +101,7 @@ export async function POST(request: Request) {
       </div>
     `;
 
-    const emailSubject = overrideTitle ? overrideTitle : \`[SAP HO] Pembaruan Status Tiket ${ticketNumber} - ${status}\`;
+    const emailSubject = overrideTitle ? overrideTitle : '[SAP HO] Pembaruan Status Tiket ${ticketNumber} - ${status}';
 
     const { data, error } = await resend.emails.send({
       from: 'Helpdesk SAP HO <no-reply@sap-ho.my.id>',
