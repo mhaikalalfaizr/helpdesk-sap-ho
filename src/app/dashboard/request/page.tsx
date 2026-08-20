@@ -408,7 +408,7 @@ export default function UserDashboard() {
 
   const activeCategoryLabel = categories.find(c => c.value === categoryId)?.label || '';
   const isTiketCategory = activeCategoryLabel.toLowerCase().includes('tiket');
-  const isHeadOffice = userProfile?.work_unit?.toLowerCase().includes('head office');
+  const isHeadOffice = userProfile?.work_unit?.toLowerCase().includes('head office') || userProfile?.division?.toLowerCase().includes('head office');
 
   if (loading || !userProfile) return null;
 
