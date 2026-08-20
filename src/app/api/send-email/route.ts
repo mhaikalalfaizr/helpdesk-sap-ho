@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     let finalEmail = overrideEmail;
     let finalName = overrideName;
 
-    if (!finalEmail) {
+    if (targetRole === 'pic' || targetRole === 'pengaju' || !finalEmail) {
       let targetUserId = ticket.user_id;
       if (targetRole === 'pic' && ticket.current_pic_id) {
         targetUserId = ticket.current_pic_id;
