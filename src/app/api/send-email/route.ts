@@ -60,7 +60,7 @@ export async function POST(request: Request) {
       finalName = profile?.full_name || 'Pengaju';
     }
 
-    const title = overrideTitle || ticket.request_title;
+    const title = ticket.request_title;
 
     if (!finalEmail || !ticketNumber || !title || !status) {
       return NextResponse.json(
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
           </tr>
           <tr>
             <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">Judul Permohonan</td>
-            <td style="padding: 10px; border: 1px solid #e2e8f0;">${title}</td>
+            <td style="padding: 10px; border: 1px solid #e2e8f0;">${ticket.request_title}</td>
           </tr>
           <tr style="background-color: #f8fafc;">
             <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">Status Terbaru</td>
@@ -101,12 +101,10 @@ export async function POST(request: Request) {
       </div>
     `;
 
-    const emailSubject = overrideTitle ? overrideTitle : '[SAP HO] Pembaruan Status Tiket ${ticketNumber} - ${status}';
-
     const { data, error } = await resend.emails.send({
       from: 'Helpdesk SAP HO <no-reply@sap-ho.my.id>',
       to: finalEmail,
-      subject: emailSubject,
+      subject: \`[SAP HO] Pembaruan Status Tiket ${ticketNumber} - ${status}\`,
       html: emailHtml,
     });
 
