@@ -29,7 +29,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Akses Ditolak: Sesi tidak valid' }, { status: 401 });
     }
 
-    const { ticketNumber, status, notes, targetRole } = await request.json();
+    const { ticketNumber, status, notes, targetRole, recipientEmail: overrideEmail, recipientName: overrideName, title: overrideTitle } = await request.json();
 
     const { data: ticket, error: ticketError } = await supabase
       .from('requests')
@@ -41,24 +41,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Akses Ditolak: Tiket tidak valid atau tidak diizinkan.' }, { status: 403 });
     }
 
-    let targetUserId = ticket.user_id;
-    if (targetRole === 'pic' && ticket.current_pic_id) {
-      targetUserId = ticket.current_pic_id;
+    let finalEmail = overrideEmail;
+    let finalName = overrideName;
+
+    if (!finalEmail) {
+      let targetUserId = ticket.user_id;
+      if (targetRole === 'pic' && ticket.current_pic_id) {
+        targetUserId = ticket.current_pic_id;
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('email, full_name')
+        .eq('id', targetUserId)
+        .single();
+
+      finalEmail = profile?.email;
+      finalName = profile?.full_name || 'Pengaju';
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('email, full_name')
-      .eq('id', targetUserId)
-      .single();
+    const title = overrideTitle || ticket.request_title;
 
-    const recipientEmail = profile?.email;
-    const recipientName = profile?.full_name || 'Pengaju';
-    const title = ticket.request_title;
-
-    if (!recipientEmail || !ticketNumber || !title || !status) {
+    if (!finalEmail || !ticketNumber || !title || !status) {
       return NextResponse.json(
-        { error: 'Data tiket tidak lengkap di database. Pastikan profil pengaju memiliki email.' },
+        { error: 'Data tiket tidak lengkap di database. Pastikan profil target memiliki email.' },
         { status: 400 }
       );
     }
@@ -66,7 +72,7 @@ export async function POST(request: Request) {
     const emailHtml = `
       <div style="font-family: sans-serif; padding: 20px; color: #334155; max-width: 600px; border: 1px solid #e2e8f0; border-radius: 8px;">
         <h2 style="color: #0e422a;">Helpdesk SAP HO Notification</h2>
-        <p>Halo <strong>${recipientName}</strong>,</p>
+        <p>Halo <strong>${finalName}</strong>,</p>
         <p>Terdapat pembaruan status penting terkait pelacakan dokumen di sistem helpdesk:</p>
 
         <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
@@ -76,7 +82,7 @@ export async function POST(request: Request) {
           </tr>
           <tr>
             <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">Judul Permohonan</td>
-            <td style="padding: 10px; border: 1px solid #e2e8f0;">${ticket.request_title}</td>
+            <td style="padding: 10px; border: 1px solid #e2e8f0;">${title}</td>
           </tr>
           <tr style="background-color: #f8fafc;">
             <td style="padding: 10px; border: 1px solid #e2e8f0; font-weight: bold;">Status Terbaru</td>
@@ -95,10 +101,12 @@ export async function POST(request: Request) {
       </div>
     `;
 
+    const emailSubject = overrideTitle ? overrideTitle : \`[SAP HO] Pembaruan Status Tiket ${ticketNumber} - ${status}\`;
+
     const { data, error } = await resend.emails.send({
       from: 'Helpdesk SAP HO <no-reply@sap-ho.my.id>',
-      to: recipientEmail,
-      subject: `[SAP HO] Pembaruan Status Tiket ${ticketNumber} - ${status}`,
+      to: finalEmail,
+      subject: emailSubject,
       html: emailHtml,
     });
 
