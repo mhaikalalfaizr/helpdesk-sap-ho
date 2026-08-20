@@ -14,7 +14,7 @@ export default function UserDashboard() {
   const router = useRouter();
   const supabase = createClient();
 
-  const [userProfile, setUserProfile] = useState<{ id: string; fullName: string; division: string; email: string } | null>(null);
+  const [userProfile, setUserProfile] = useState<{ id: string; fullName: string; division: string; email: string; work_unit: string } | null>(null);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [subCategoryOptions, setSubCategoryOptions] = useState<{ value: string; label: string }[]>([]);
   const [subCategory, setSubCategory] = useState<string | null>(null);
@@ -96,7 +96,7 @@ export default function UserDashboard() {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('full_name, division, email, role')
+      .select('full_name, division, email, role, work_unit')
       .eq('id', user.id)
       .maybeSingle();
 
@@ -116,6 +116,7 @@ export default function UserDashboard() {
         fullName: profile.full_name,
         division: profile.division,
         email: profile.email || '',
+        work_unit: profile.work_unit || '',
       });
       setCurrentUserName(profile.full_name);
     }
@@ -447,6 +448,7 @@ export default function UserDashboard() {
 
   const activeCategoryLabel = categories.find(c => c.value === categoryId)?.label || '';
   const isTiketCategory = activeCategoryLabel.toLowerCase().includes('tiket');
+  const isHeadOffice = userProfile?.division?.includes('head office') || userProfile?.work_unit?.includes('head office') || userProfile?.division?.toLowerCase()=== 'ho' ||userProfile?.work_unit?.toLowerCase()=== 'ho';
 
   if (loading || !userProfile) return null;
 
@@ -518,13 +520,14 @@ export default function UserDashboard() {
               radius="md"
             />
             <FileInput
-              label="Unggah Dokumen Pengajuan (PDF) - Maksimal 5 MB"
-              placeholder={isTiketCategory ? "Opsional (dalam format PDF) - Maksimal 5 MB" : "Pilih dokumen dari perangkat Anda"}
-              required={!isTiketCategory}
-              withAsterisk={!isTiketCategory}
+              label="Unggah Dokumen Pengajuan (PDF / .docx / .xlsx) - Maksimal 5 MB"
+              placeholder={isTiketCategory && !isHeadOffice ? "Opsional (dalam format PDF) - Maksimal 5 MB" : "Pilih dokumen dari perangkat Anda"}
+              required={!isTiketCategory && !isHeadOffice}
+              withAsterisk={!isTiketCategory && !isHeadOffice}
               value={files}
               onChange={handleFilesChange}
-              accept="application/pdf"
+              accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,
+                      application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               multiple
               radius="md"
             />

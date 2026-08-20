@@ -25,7 +25,7 @@ export default function EmailModal({ opened, onClose, ticket, currentUserName, c
 
         Nomor Tiket : ${ticket.ticket_number}
         Judul       : ${ticket.request_title}
-        Unit Kerja  : ${ticket.profiles?.unit_kerja || '-'}
+        Unit Kerja  : ${ticket.profiles?.work_unit || '-'}
         Kategori    : ${ticket.categories?.name || '-'}
 
         Mohon diterima dan diarsipkan. Terima kasih.

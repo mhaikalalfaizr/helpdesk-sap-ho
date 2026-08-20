@@ -32,7 +32,7 @@ Struktur relasional data utama dalam Supabase:
 
 - `profiles`:
   - `id` (UUID, FK to auth.users)
-  - `name`, `email`, `role`, `unit_kerja`
+  - `name`, `email`, `role`, `work_unit`
 - `requests` (Tickets):
   - `id`, `ticket_number`, `request_title`, `description`, `status`, `created_at`, `user_id`
 - `attachments`:

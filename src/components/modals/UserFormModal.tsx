@@ -51,7 +51,7 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
   const [confirmPassword, setConfirmPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
-  const [unitKerja, setUnitKerja] = useState<string | null>('');
+  const [workUnit, setWorkUnit] = useState<string | null>('');
   const [division, setDivision] = useState<string | null>('');
   const [role, setRole] = useState<string | null>('Pengaju');
 
@@ -96,7 +96,7 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
 
   useEffect(() => {
     const fetchDivisions = async () => {
-      if (unitKerja !== 'Head Office') {
+      if (workUnit !== 'Head Office') {
         setDivisionOptions([]);
         setDivision('');
         return;
@@ -131,7 +131,7 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
     };
 
     fetchDivisions();
-  }, [unitKerja]);
+  }, [workUnit]);
 
   useEffect(() => {
     if (!opened) return;
@@ -139,8 +139,8 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
     if (editingUser) {
       setFullName(editingUser.full_name || '');
       setEmail(editingUser.email || '');
-      setUnitKerja(editingUser.unit_kerja || '');
-      setDivision(editingUser.unit_kerja === 'Head Office' ? editingUser.division || '' : '');
+      setWorkUnit(editingUser.work_unit || '');
+      setDivision(editingUser.work_unit === 'Head Office' ? editingUser.division || '' : '');
       setRole(editingUser.role || 'Pengaju');
       setPassword('');
       setConfirmPassword('');
@@ -153,7 +153,7 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
       setConfirmPassword('');
       setNewPassword('');
       setConfirmNewPassword('');
-      setUnitKerja('');
+      setWorkUnit('');
       setDivision('');
       setRole('Pengaju');
     }
@@ -162,8 +162,8 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
   const handleSubmit = async () => {
     const cleanName = fullName.trim();
     const cleanEmail = email.trim().toLowerCase();
-    const cleanUnitKerja = unitKerja?.trim() || null;
-    const cleanDivision = cleanUnitKerja === 'Head Office' ? division?.trim() || '' : '-';
+    const cleanWorkUnit = workUnit?.trim() || null;
+    const cleanDivision = cleanWorkUnit === 'Head Office' ? division?.trim() || '' : '-';
 
     if (!cleanName) {
       notifications.show({ title: 'Data Belum Lengkap', message: 'Nama lengkap wajib diisi.', color: 'red' });
@@ -175,12 +175,12 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
       return;
     }
 
-    if (!cleanUnitKerja) {
+    if (!cleanWorkUnit) {
       notifications.show({ title: 'Data Belum Lengkap', message: 'Unit kerja wajib dipilih.', color: 'red' });
       return;
     }
 
-    if (cleanUnitKerja === 'Head Office' && !cleanDivision) {
+    if (cleanWorkUnit === 'Head Office' && !cleanDivision) {
       notifications.show({ title: 'Data Belum Lengkap', message: 'Divisi wajib dipilih untuk Head Office.', color: 'red' });
       return;
     }
@@ -218,7 +218,7 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
           .from('profiles')
           .update({
             full_name: cleanName,
-            unit_kerja: cleanUnitKerja,
+            work_unit: cleanWorkUnit,
             division: cleanDivision,
             role,
           })
@@ -246,7 +246,7 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
         onSuccess({
           ...editingUser,
           full_name: cleanName,
-          unit_kerja: cleanUnitKerja,
+          work_unit: cleanWorkUnit,
           division: cleanDivision,
           role: role as UserProfile['role'],
         });
@@ -264,7 +264,7 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
             full_name: cleanName,
             email: cleanEmail,
             password,
-            unit_kerja: cleanUnitKerja,
+            work_unit: cleanWorkUnit,
             division: cleanDivision,
             role,
           }),
@@ -280,7 +280,7 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
           id: json.userId,
           full_name: cleanName,
           email: cleanEmail,
-          unit_kerja: cleanUnitKerja,
+          work_unit: cleanWorkUnit,
           division: cleanDivision,
           role: role as UserProfile['role'],
           is_active: true,
@@ -376,8 +376,8 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
           searchable
           clearable
           nothingFoundMessage="Unit kerja tidak ditemukan."
-          value={unitKerja}
-          onChange={setUnitKerja}
+          value={workUnit}
+          onChange={setWorkUnit}
           leftSection={<IconBriefcase size={16} stroke={1.5} color="#94a3b8" />}
           rightSection={loadingWorkUnits ? undefined : undefined}
           required
@@ -386,7 +386,7 @@ export default function UserFormModal({ opened, onClose, editingUser, onSuccess 
           styles={inputStyles}
         />
 
-        {unitKerja === 'Head Office' && (
+        {workUnit === 'Head Office' && (
           <Select
             label="Divisi"
             placeholder="Cari atau pilih divisi"

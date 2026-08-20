@@ -1,7 +1,10 @@
-import { Drawer, Group, Badge, Text, Stack, Box, Paper, NumberInput, Button, ActionIcon, Tooltip, Divider, Timeline } from '@mantine/core';
-import { IconPencil, IconDownload } from '@tabler/icons-react';
+import { useState } from 'react';
+import { Drawer, Group, Badge, Text, Stack, Box, Paper, NumberInput, Button, ActionIcon, Tooltip, Divider, Timeline, Modal } from '@mantine/core';
+import { IconPencil, IconDownload, IconUpload, IconTrash } from '@tabler/icons-react';
 import { RequestItem, RequestLog } from '@/utils/types';
 import { getProjectedDate } from '@/utils/helpers';
+import { createClient } from '@/lib/supabase/client';
+import { notifications } from '@mantine/notifications'
 
 interface DetailDrawerProps {
   detail: RequestItem | null;
@@ -26,6 +29,103 @@ export default function DetailDrawer({
   onEditSla, onCancelEditSla, onSlaValueChange, onSaveSla,
   currentUserRole, currentPicId, onDownload
 }: DetailDrawerProps) {
+
+  const [uploadAwal, setUploadAwal] = useState(false);
+  const [fileToDelete, setFileToDelete] = useState<{id: string, url: string} | null>(null);
+
+  const handleDocumentUploadStaff = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !detail) return;
+
+    const payload = Array.from(files);
+    const MAX_SIZE_MB = 5;
+
+    const oversizedFiles = payload.filter(file => file.size / (1024 * 1024) > MAX_SIZE_MB);
+    if (oversizedFiles.length > 0) {
+      notifications.show({
+        title: 'Berkas Terlalu Besar',
+        message: `Ukuran berkas melebihi ${MAX_SIZE_MB} MB.`,
+        color: 'red',
+      });
+      e.target.value = '';
+      return;
+    }
+
+    setUploadAwal(true);
+    const supabase = createClient();
+
+    try {
+      if (!currentPicId) throw new Error("ID Staf tidak ditemukan.");
+
+      const newAttachments = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const sanitizedName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+        const uniqueFileName = `${Date.now()}_${sanitizedName}`;
+        const filePath = `user_docs/${uniqueFileName}`;
+
+        const { error: uploadError } = await supabase.storage.from('documents').upload(filePath, file);
+        if (uploadError) throw new Error("STORAGE_ERROR: " + uploadError.message);
+
+        const { data: urlData } = supabase.storage.from('documents').getPublicUrl(filePath);
+
+        const { data: insertedDb, error: dbError } = await supabase.from('attachments').insert({
+          request_id: detail.id,
+          file_name: file.name,
+          file_url: urlData.publicUrl,
+          type: 'Dokumen_Awal',
+          uploaded_by: currentPicId
+        }).select().single();
+        if (dbError) throw new Error("Gagal: Error Pada Database " + dbError.message);
+        if (insertedDb) newAttachments.push(insertedDb);
+      }
+      if (!detail.attachments) detail.attachments = [];
+      detail.attachments.push(...newAttachments);
+
+      e.target.value = '';
+
+      notifications.show({
+        title: 'Berhasil Mengunggah Dokumen',
+        message: `${newAttachments.length} dokumen telah ditambahkan ke lampiran.`,
+        color: 'green',
+      });
+
+    } catch (err: any) {
+      notifications.show({ title: 'Gagal Mengunggah Dokumen', message: 'Terjadi kesalahan saat mengunggah dokumen.', color: 'red' });
+    } finally {
+      setUploadAwal(false);
+    }
+  };
+  const handleDeleteAttachment = async () => {
+    if(!fileToDelete) return;
+    setUploadAwal(true);
+    const supabase = createClient();
+    try {
+      const pathParts = fileToDelete.url.split('/documents/');
+      if (pathParts.length > 1) {
+        await supabase.storage.from('documents').remove([pathParts[1]]);
+      }
+
+      await supabase.from('attachments').delete().eq('id', fileToDelete.id);
+
+      if (detail && detail.attachments) {
+        detail.attachments = detail.attachments.filter(a => a.id !== fileToDelete.id);
+      }
+
+      notifications.show({
+        title: 'Berhasil Menghapus Dokumen',
+        message: 'Dokumen berhasil dihapus dari sistem.',
+        color: 'green',
+      });
+
+    } catch (error) {
+      notifications.show({ title: 'Gagal Menghapus Dokumen', message: "Terjadi kesalahan saat menghapus dokumen.", color: 'red' });
+    } finally {
+      setUploadAwal(false);
+      setFileToDelete(null);
+    }
+  };
 
   return (
     <Drawer
@@ -53,9 +153,9 @@ export default function DetailDrawer({
             <Text size="xs" c="dimmed" fw={600} mb={4}>INFORMASI PENGAJU</Text>
             <Text fw={700} size="sm" c="slateClean.8">{detail.profiles?.full_name}</Text>
             <Text size="xs" c="slateClean.5">
-              {detail.profiles?.unit_kerja === 'Head Office'
-                ? `${detail.profiles.unit_kerja} | ${detail.profiles.division || ''}`
-                : (detail.profiles?.unit_kerja || 'Lokasi Kerja')}
+              {detail.profiles?.work_unit === 'Head Office'
+                ? `${detail.profiles.work_unit} | ${detail.profiles.division || ''}`
+                : (detail.profiles?.work_unit || 'Lokasi Kerja')}
               {detail.profiles?.email ? ` • ${detail.profiles.email}` : ''}
             </Text>
           </Box>
@@ -115,51 +215,78 @@ export default function DetailDrawer({
 
           { }
           <Box>
-            <Text size="xs" c="dimmed" fw={600} mb={4}>DESKRIPSI & KETERANGAN DOKUMEN</Text>
+            <Text size="xs" c="dimmed" fw={600} mb={4}>DESKRIPSI / KETERANGAN</Text>
             <Paper p="md" withBorder radius="md" bg="var(--mantine-color-slateClean-0)" style={{ borderColor: 'var(--mantine-color-slateClean-2)' }}>
               <Text size="sm" c="slateClean.7" style={{ whiteSpace: 'pre-line', lineHeight: '1.6' }}>
-                {detail.description || 'Pengaju tidak menyertakan keterangan tertulis pada dokumen ini.'}
+                {detail.description || 'Tidak ada keterangan.'}
               </Text>
             </Paper>
           </Box>
 
           { }
-          {detail.attachments && detail.attachments.filter((a) => a.type === 'Dokumen_Awal').length > 0 ? (
+
+          {detail.attachments && detail.attachments.filter((a) => a.type === 'Dokumen_Awal').length > 0 && (
             <Box>
               <Text size="xs" c="dimmed" fw={600} mb={4}>
                 LAMPIRAN DOKUMEN AWAL ({detail.attachments.filter((a) => a.type === 'Dokumen_Awal').length} Dokumen)
               </Text>
+
               <Stack gap="xs">
                 {detail.attachments.filter((att) => att.type === 'Dokumen_Awal').map((file, idx: number) => (
-                  <Button
-                    key={file.id || idx}
-                    onClick={() => onDownload(file.file_url, file.file_name || 'Dokumen')}
-                    variant="outline" color="ptpn4Green.9" fullWidth leftSection={<IconDownload size={16} />}
-                    styles={{ inner: { justifyContent: 'flex-start' } }}
-                  >
-                    <Text size="xs" truncate style={{ maxWidth: '90%' }}>
-                      {file.file_name || `Unduh Dokumen Lampiran ${idx + 1}`}
-                    </Text>
-                  </Button>
+                  <Group key={file.id || idx} wrap="nowrap" gap="xs">
+                    <Button
+                      style={{ flex: 1 }}
+                      onClick={() => onDownload(file.file_url, file.file_name || 'Dokumen')}
+                      variant="outline" color="ptpn4Green.9" leftSection={<IconDownload size={16} />}
+                      styles={{ inner: { justifyContent: 'flex-start' } }}
+                    >
+                      <Text size="xs" truncate style={{ maxWidth: '90%' }}>
+                        {file.file_name || `Unduh Dokumen Lampiran ${idx + 1}`}
+                      </Text>
+                    </Button>
+
+                    {(currentUserRole === 'Staf' || currentUserRole === 'Koordinator') && (
+                      <ActionIcon
+                        variant="light"
+                        color="red"
+                        size="lg"
+                        onClick={() => setFileToDelete({ id: file.id, url: file.file_url })}
+                      >
+                        <IconTrash size={18} />
+                      </ActionIcon>
+                    )}
+                  </Group>
                 ))}
               </Stack>
+              {(currentUserRole === 'Staf' || currentUserRole === 'Koordinator') && (
+                <Box mt="sm">
+                  <Button
+                    component="label"
+                    variant="fill"
+                    color="ptpn4Green.5"
+                    loading={uploadAwal}
+                    leftSection={<IconUpload size={16} />}
+                    styles={{ inner: { justifyContent: 'flex-start' } }}
+                  >
+                    <Text size="xs" truncate>
+                      Unggah
+                    </Text>
+                    <input
+                      type="file"
+                      hidden
+                      multiple
+                      accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,
+                          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                      onChange={handleDocumentUploadStaff}
+                    />
+                  </Button>
+                </Box>
+              )}
             </Box>
-          ) : (
-            detail.file_url && (
-              <Box>
-                <Text size="xs" c="dimmed" fw={600} mb={4}></Text>
-                <Button
-                  component="a" target="_blank" rel="noopener noreferrer"
-                  variant="outline" color="ptpn4Green.9" fullWidth leftSection={<IconDownload size={16} />}
-                >
-                  Buka Dokumen PDF
-                </Button>
-              </Box>
-            )
           )}
 
           {detail.attachments?.some((a: any) => a.type === 'Dokumen_Final') && (
-            <Box mt="sm">
+            <Box>
               <Text size="xs" c="ptpn4Green.9" fw={800} mb={4}>LAMPIRAN DOKUMEN FINAL</Text>
               <Stack gap="xs">
                 {detail.attachments
@@ -180,7 +307,6 @@ export default function DetailDrawer({
             </Box>
           )}
 
-          { }
           <Divider my="sm" label={<Text size="10px" fw={700} c="slateClean.4" lts="0.5px">RIWAYAT STATUS DOKUMEN</Text>} labelPosition="center" />
           {loadingTimeline ? (
             <Text size="xs" ta="center" c="dimmed" py="sm">Memuat riwayat log...</Text>
@@ -215,7 +341,26 @@ export default function DetailDrawer({
             </Timeline>
           )}
         </Stack>
+
       )}
+
+      <Modal
+        opened={!!fileToDelete}
+        onClose={() => setFileToDelete(null)}
+        title={<Text fw={700}>Konfirmasi Penghapusan</Text>}
+        centered
+        radius="md"
+        zIndex={1000}
+      >
+        <Text size="sm" mb="xl">
+          Apakah Anda yakin ingin menghapus lampiran ini secara permanen? Dokumen yang dihapus tidak dapat dipulihkan.
+        </Text>
+        <Group justify="flex-end">
+          <Button variant="default" onClick={() => setFileToDelete(null)}>Batal</Button>
+          <Button color="red.9" onClick={handleDeleteAttachment} loading={uploadAwal}>Hapus Dokumen</Button>
+        </Group>
+      </Modal>
+
     </Drawer>
   );
 }

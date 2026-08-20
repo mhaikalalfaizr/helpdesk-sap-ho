@@ -171,7 +171,8 @@ export default function PicDashboard() {
                 status: payload.recipientEmail === assignRequest.profiles?.email
                   ? 'Pembaruan Penanggung Jawab'
                   : 'Tugas Baru Dialokasikan',
-                notes: payload.notes
+                notes: payload.notes,
+                targetRole: payload.recipientEmail === assignRequest.profiles?.email ? 'pengaju' : 'pic'
               }),
             });
 
@@ -181,7 +182,7 @@ export default function PicDashboard() {
             }
           } catch (e) {
             console.error('Gagal mengirim sub-email notifikasi delegasi (jaringan terputus):', e);
-          }
+          } 
         })
       );
 
@@ -401,7 +402,7 @@ export default function PicDashboard() {
       const isAccessRequest = catName.includes('access') || subCatName.includes('access');
 
       const division = (finalUploadRequest.profiles?.division || '').toLowerCase();
-      const workUnit = (finalUploadRequest.profiles?.unit_kerja || '').toLowerCase();
+      const workUnit = (finalUploadRequest.profiles?.work_unit || '').toLowerCase();
       const isHeadOffice = division.includes('head office') || workUnit.includes('head office') || division === 'ho' || workUnit === 'ho';
       const shouldSendEmail = isAccessRequest && isHeadOffice;
 
@@ -878,9 +879,9 @@ export default function PicDashboard() {
                           <Table.Td>
                             <Text size="sm" fw={600} c="slateClean.8">{req.profiles?.full_name || 'Tanpa Nama'}</Text>
                             <Text size="xs" c="dimmed">
-                              {req.profiles?.unit_kerja === 'Head Office'
-                                ? `${req.profiles.unit_kerja} | ${req.profiles.division || ''}`
-                                : (req.profiles?.unit_kerja || 'Lokasi Kerja')}
+                              {req.profiles?.work_unit === 'Head Office'
+                                ? `${req.profiles.work_unit} | ${req.profiles.division || ''}`
+                                : (req.profiles?.work_unit || 'Lokasi Kerja')}
                             </Text>
                           </Table.Td>
 

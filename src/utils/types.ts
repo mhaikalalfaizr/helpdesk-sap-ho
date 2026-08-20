@@ -25,7 +25,7 @@ export interface RequestItem {
     sub_categories?: { name: string; sla_days: number };
     pic?: { full_name: string } | null;
     attachments?: { id: string; file_url: string; type: string; file_name?: string }[];
-    profiles: { full_name: string; unit_kerja: string; division: string; email?: string } | null;
+    profiles: { full_name: string; work_unit: string; division: string; email?: string } | null;
 }
 
 export interface CategoryOption {
@@ -54,7 +54,7 @@ export interface UserProfile {
     id: string;
     full_name: string;
     email: string;
-    unit_kerja: string | null;
+    work_unit: string | null;
     division: string | null;
     role: 'Koordinator' | 'Staf' | 'Pengaju';
     is_active: boolean;

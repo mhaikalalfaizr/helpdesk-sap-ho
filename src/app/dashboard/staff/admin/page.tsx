@@ -57,7 +57,7 @@ export default function UserManagementPage() {
   };
 
   const fetchUsers = async () => {
-    const { data, error } = await supabase.from('profiles').select('id, full_name, email, unit_kerja, division, role, is_active, created_at').order('created_at', { ascending: false });
+    const { data, error } = await supabase.from('profiles').select('id, full_name, email, work_unit, division, role, is_active, created_at').order('created_at', { ascending: false });
     if (error) {
       console.error('Gagal mengambil data pengguna:', error);
       notifications.show({ title: 'Gagal', message: 'Tidak dapat memuat daftar pengguna.', color: 'red' });
@@ -180,8 +180,8 @@ export default function UserManagementPage() {
                         <Table.Td><Text size="sm" fw={600} c="slateClean.8">{user.full_name}</Text></Table.Td>
                         <Table.Td><Text size="sm" c="slateClean.6">{user.email}</Text></Table.Td>
                         <Table.Td>
-                          <Text size="sm" c="slateClean.6">{user.unit_kerja || '-'}</Text>
-                          {user.unit_kerja === 'Head Office' && user.division && <Text size="xs" c="dimmed">{user.division}</Text>}
+                          <Text size="sm" c="slateClean.6">{user.work_unit || '-'}</Text>
+                          {user.work_unit === 'Head Office' && user.division && <Text size="xs" c="dimmed">{user.division}</Text>}
                         </Table.Td>
                         <Table.Td><Badge color={getRoleBadgeColor(user.role)} variant="light" py="md" radius="sm">{user.role}</Badge></Table.Td>
                         <Table.Td><Badge color={user.is_active ? 'green' : 'slateClean'} variant="light" py="md" radius="sm">{user.is_active ? '🟢 Aktif' : '⚫ Nonaktif'}</Badge></Table.Td>

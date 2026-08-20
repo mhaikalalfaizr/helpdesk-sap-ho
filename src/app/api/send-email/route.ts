@@ -29,11 +29,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Akses Ditolak: Sesi tidak valid' }, { status: 401 });
     }
 
-    const { ticketNumber, status, notes } = await request.json();
+    const { ticketNumber, status, notes, targetRole } = await request.json();
 
     const { data: ticket, error: ticketError } = await supabase
       .from('requests')
-      .select('id, request_title, user_id, profiles:user_id(email, full_name)')
+      .select('id, request_title, user_id, profiles:user_id(email, full_name), current_pic_id')
       .eq('ticket_number', ticketNumber)
       .single();
 
@@ -41,8 +41,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Akses Ditolak: Tiket tidak valid atau tidak diizinkan.' }, { status: 403 });
     }
 
-    const recipientEmail = (ticket.profiles as any)?.email;
-    const recipientName = (ticket.profiles as any)?.full_name || 'Pengaju';
+    let targetUserId = ticket.user_id;
+    if (targetRole === 'pic' && ticket.current_pic_id) {
+      targetUserId = ticket.current_pic_id;
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('email, full_name')
+      .eq('id', targetUserId)
+      .single();
+
+    const recipientEmail = profile?.email;
+    const recipientName = profile?.full_name || 'Pengaju';
     const title = ticket.request_title;
 
     if (!recipientEmail || !ticketNumber || !title || !status) {

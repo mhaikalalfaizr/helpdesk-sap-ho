@@ -23,7 +23,7 @@ export default function FinalUploadModal({ opened, onClose, ticket, currentUserN
   const subCatName = (ticket?.sub_categories?.name || '').toLowerCase();
   const isAccessRequest = catName.includes('access') || subCatName.includes('access');
   const division = (ticket?.profiles?.division || '').toLowerCase();
-  const workUnit = (ticket?.profiles?.unit_kerja || '').toLowerCase();
+  const workUnit = (ticket?.profiles?.work_unit || '').toLowerCase();
   const isHeadOffice = division.includes('head office') || workUnit.includes('head office') || division === 'ho' || workUnit === 'ho';
 
   const shouldSendEmail = isAccessRequest && isHeadOffice;
@@ -41,7 +41,7 @@ Bersama ini kami sampaikan bahwa pengajuan berikut telah disetujui dan dokumen f
 
 Nomor Tiket: ${ticket.ticket_number}
 Judul: ${ticket.request_title}
-Unit Kerja: ${ticket.profiles?.unit_kerja || '-'}
+Unit Kerja: ${ticket.profiles?.work_unit || '-'}
 Kategori: ${ticket.categories?.name || '-'}
 
 Mohon diterima dan diarsipkan. Terima kasih.
@@ -74,7 +74,7 @@ Tim Helpdesk SAP HO`
     <Modal opened={opened} onClose={onClose} title={<Text fw={700}>Setujui Tiket & Unggah Dokumen Final</Text>} size="xl" centered radius="lg">
       <form onSubmit={handleSubmit}>
         <Stack gap="md">
-          <FileInput label="1. Pilih Dokumen Final (.PDF)" placeholder="Klik untuk memilih berkas" multiple accept="application/pdf" value={finalFiles} onChange={setFinalFiles} required radius="md" />
+          <FileInput label="1. Pilih Dokumen Final (PDF / .docx / .xlsx)" placeholder="Klik untuk memilih berkas" multiple accept="application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" value={finalFiles} onChange={setFinalFiles} required radius="md" />
 
         {shouldSendEmail && (
         <>

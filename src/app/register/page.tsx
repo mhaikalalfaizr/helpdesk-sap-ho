@@ -128,7 +128,7 @@ export default function RegisterPage() {
   //           id: authData.user.id,
   //           email,
   //           full_name: fullName,
-  //           unit_kerja: workUnit,
+  //           work_unit: workUnit,
   //           division: workUnit === 'Head Office' ? division : null,
   //           role: 'Pengaju',
   //         },

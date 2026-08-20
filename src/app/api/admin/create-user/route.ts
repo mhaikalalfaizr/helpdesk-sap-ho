@@ -50,11 +50,11 @@ export async function POST(request: Request) {
       email,
       password,
       division,
-      unit_kerja,
+      work_unit,
       role,
     } = await request.json();
 
-    if (!full_name || !email || !password || !unit_kerja || !role) {
+    if (!full_name || !email || !password || !work_unit || !role) {
       return NextResponse.json(
         { error: 'Nama, email, kata sandi, unit kerja, dan role wajib diisi.' },
         { status: 400 }
@@ -77,21 +77,21 @@ export async function POST(request: Request) {
       );
     }
 
-    const cleanUnitKerja = String(unit_kerja).trim();
+    const cleanWorkUnit = String(work_unit).trim();
 
     const cleanDivision =
-      cleanUnitKerja === 'Head Office'
+      cleanWorkUnit === 'Head Office'
         ? String(division || '').trim()
         : '-';
 
-    if (!cleanUnitKerja) {
+    if (!cleanWorkUnit) {
       return NextResponse.json(
         { error: 'Unit kerja wajib dipilih.' },
         { status: 400 }
       );
     }
 
-    if (cleanUnitKerja === 'Head Office' && !cleanDivision) {
+    if (cleanWorkUnit === 'Head Office' && !cleanDivision) {
       return NextResponse.json(
         { error: 'Divisi wajib dipilih untuk user Head Office.' },
         { status: 400 }
@@ -141,7 +141,7 @@ export async function POST(request: Request) {
         id: newAuthUser.user.id,
         full_name: String(full_name).trim(),
         email: String(email).trim().toLowerCase(),
-        unit_kerja: cleanUnitKerja,
+        work_unit: cleanWorkUnit,
         division: cleanDivision,
         role,
         is_active: true,

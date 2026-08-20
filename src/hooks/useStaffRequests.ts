@@ -47,7 +47,7 @@ export function useStaffRequests() {
             .from('requests')
             .select(`
             id, ticket_number, request_title, description, status, total_hold_days, created_at, updated_at, file_url, current_pic_id, urgency, custom_sla_days,
-            profiles:user_id (full_name, unit_kerja, division, email),
+            profiles:user_id (full_name, work_unit, division, email),
             categories:category_id (id, name, sla_days),
             sub_categories:sub_category_id (name, sla_days),
             pic:current_pic_id (full_name),
@@ -94,7 +94,7 @@ export function useStaffRequests() {
                 .from('requests')
                 .select(`
             id, ticket_number, request_title, description, status, total_hold_days, created_at, updated_at, file_url, current_pic_id, urgency, custom_sla_days,
-            profiles:user_id (full_name, unit_kerja, division, email),
+            profiles:user_id (full_name, work_unit, division, email),
             categories:category_id (id, name, sla_days),
             sub_categories:sub_category_id (name, sla_days),
             pic:current_pic_id (full_name),
