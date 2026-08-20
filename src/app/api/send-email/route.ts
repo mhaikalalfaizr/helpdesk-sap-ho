@@ -104,7 +104,7 @@ export async function POST(request: Request) {
     const { data, error } = await resend.emails.send({
       from: 'Helpdesk SAP HO <no-reply@sap-ho.my.id>',
       to: finalEmail,
-      subject: \`[SAP HO] Pembaruan Status Tiket ${ticketNumber} - ${status}\`,
+      subject: `[SAP HO] Pembaruan Status Tiket ${ticketNumber} - ${status}`,
       html: emailHtml,
     });
 
