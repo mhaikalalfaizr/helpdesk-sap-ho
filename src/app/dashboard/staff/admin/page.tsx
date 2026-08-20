@@ -45,13 +45,21 @@ export default function UserManagementPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.replace('/login'); return; }
+
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
-      if (!profile || profile.role !== 'Koordinator') { router.replace('/dashboard/staff'); return; }
+
+      if (!profile || profile.role !== 'Koordinator') { 
+        router.replace('/dashboard/staff'); 
+        return; 
+      }
+
       setCurrentUserId(user.id);
       await fetchUsers();
+
+      setLoading(false);
+
     } catch (err) {
       console.error('Error inisialisasi halaman Manajemen Pengguna:', err);
-    } finally {
       setLoading(false);
     }
   };
@@ -114,6 +122,12 @@ export default function UserManagementPage() {
   const getRoleBadgeColor = (role: string) => role === 'Koordinator' ? 'blue' : role === 'Staf' ? 'ptpn4Orange' : 'slateClean';
 
   const hasFilter = Boolean(roleFilter || statusFilter);
+
+  if (loading) {
+    return <Box style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+        <Text c="dimmed">Memuat...</Text>
+      </Box>
+  }
 
   return (
     <Box mb="xl">
