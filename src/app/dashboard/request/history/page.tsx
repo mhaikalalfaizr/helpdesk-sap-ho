@@ -23,10 +23,8 @@ export default function UserDashboard() {
   const supabase = createClient();
 
   const [userProfile, setUserProfile] = useState<{ id: string; fullName: string; division: string; email: string } | null>(null);
-  const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [myRequests, setMyRequests] = useState<RequestItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentUserName, setCurrentUserName] = useState<string>('');
 
   const [selectedRequest, setSelectedRequest] = useState<RequestItem | null>(null);
   const [historyLogs, setHistoryLogs] = useState<RequestLog[]>([]);
@@ -100,14 +98,11 @@ export default function UserDashboard() {
         division: profile.division,
         email: profile.email || '',
       });
-      setCurrentUserName(profile.full_name);
+
       fetchUserRequests(user.id);
     }
 
-    const { data: categoriesData } = await supabase.from('categories').select('id, name');
-    if (categoriesData) {
-      setCategories(categoriesData.map((cat) => ({ value: String(cat.id), label: cat.name })));
-    }
+
 
     const { data: holidayData } = await supabase.from('public_holidays').select('holiday_date');
     if (holidayData) {
@@ -152,10 +147,7 @@ export default function UserDashboard() {
     setLoadingTimeline(false);
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.replace('/login');
-  };
+
 
   const filteredRequests = useMemo(() => {
     let filtered = [...myRequests];

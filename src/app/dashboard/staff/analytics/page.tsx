@@ -19,11 +19,7 @@ const CHART_TOOLTIP_PROPS: BarChartProps['tooltipProps'] = {
 };
 
 export default function StafAnalyticsPage() {
-  const router = useRouter();
   const supabase = createClient();
-
-  const [currentUserName, setCurrentUserName] = useState('Staf');
-  const [holdCount, setHoldCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState({ total: 0, finished: 0, active: 0, unassigned: 0, overdue: 0, hold: 0, inProcess: 0 });
   const [slaComplianceData, setSlaComplianceData] = useState<SlaSegment[]>([]);
@@ -42,7 +38,7 @@ export default function StafAnalyticsPage() {
             .select('full_name')
             .eq('id', user.id)
             .maybeSingle();
-          if (profileData) setCurrentUserName(profileData.full_name || 'Staf');
+
         }
 
         const { data: holidayData } = await supabase.from('public_holidays').select('holiday_date');
@@ -125,7 +121,7 @@ export default function StafAnalyticsPage() {
             }
           });
 
-          setHoldCount(suspendedCount);
+
           setSummary({ total: requests.length, finished: finishedCount, active: activeCount, unassigned: unassignedCount, overdue: activeOverdueCount, hold: suspendedCount, inProcess: processCount });
 
           setSlaComplianceData([

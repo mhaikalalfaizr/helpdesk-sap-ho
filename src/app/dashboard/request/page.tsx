@@ -6,9 +6,9 @@ import { createClient } from '@/lib/supabase/client';
 import { notifications } from '@mantine/notifications';
 import {
   Paper, Text, Group, Stack, Box,
-  FileInput, Textarea, Button, TextInput, Select
+  FileInput, Textarea, Button, TextInput, Select, Pill, Badge
 } from '@mantine/core';
-import { RequestItem, RequestLog, CategoryOption } from '@/utils/types';
+import { CategoryOption } from '@/utils/types';
 
 export default function UserDashboard() {
   const router = useRouter();
@@ -18,7 +18,6 @@ export default function UserDashboard() {
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [subCategoryOptions, setSubCategoryOptions] = useState<{ value: string; label: string }[]>([]);
   const [subCategory, setSubCategory] = useState<string | null>(null);
-  const [myRequests, setMyRequests] = useState<RequestItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUserName, setCurrentUserName] = useState<string>('');
 
@@ -28,39 +27,13 @@ export default function UserDashboard() {
   const [files, setFiles] = useState<File[]>([]);
   const [formLoading, setFormLoading] = useState(false);
 
-  const [selectedRequest, setSelectedRequest] = useState<RequestItem | null>(null);
-  const [historyLogs, setHistoryLogs] = useState<RequestLog[]>([]);
-  const [loadingTimeline, setLoadingTimeline] = useState(false);
-
-  const [activeMenu, setActiveMenu] = useState(0);
-  const [sortKey, setSortKey] = useState<string | null>('date');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>('desc');
-
   const [urgency, setUrgency] = useState<string | null>(null);
-  const [publicHolidays, setPublicHolidays] = useState<string[]>([]);
+
 
   useEffect(() => {
 
     initDashboard();
 
-    const channel = supabase
-      .channel('user-db-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'requests' },
-        (payload) => {
-          if (payload.new && 'id' in payload.new) {
-            fetchSingleUpdatedMyRequest(payload.new.id as string);
-          } else if (payload.eventType === 'DELETE' && payload.old && 'id' in payload.old) {
-            setMyRequests(prev => prev.filter(r => r.id !== payload.old.id));
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, [router]);
 
   useEffect(() => {
@@ -126,70 +99,9 @@ export default function UserDashboard() {
       setCategories(categoriesData.map((cat) => ({ value: String(cat.id), label: cat.name })));
     }
 
-    const { data: holidayData } = await supabase.from('public_holidays').select('holiday_date');
-    if (holidayData) {
-      setPublicHolidays(holidayData.map(h => h.holiday_date));
-    }
+
 
     setLoading(false);
-  };
-
-  const fetchUserRequests = async (userId: string) => {
-    const { data } = await supabase
-      .from('requests')
-      .select(`
-        id, ticket_number, request_title, description, status, total_hold_days, created_at, updated_at, file_url, urgency, custom_sla_days,
-        user_profile:user_id (full_name, division, email),
-        categories:category_id (id, name, sla_days),
-        sub_categories:sub_category_id (name, sla_days),
-        pic:current_pic_id (full_name),
-        attachments (id, file_url, type)
-      `)
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(500);
-
-    if (data) setMyRequests(data as any);
-  };
-
-  const fetchSingleUpdatedMyRequest = async (requestId: string) => {
-    const { data } = await supabase
-      .from('requests')
-      .select(`
-        id, ticket_number, request_title, description, status, total_hold_days, created_at, updated_at, file_url, urgency, custom_sla_days,
-        user_profile:user_id (full_name, division, email),
-        categories:category_id (id, name, sla_days),
-        sub_categories:sub_category_id (name, sla_days),
-        pic:current_pic_id (full_name),
-        attachments (id, file_url, type)
-      `)
-      .eq('id', requestId)
-      .maybeSingle();
-
-    if (data) {
-      setMyRequests(prev => {
-        const exists = prev.find(r => r.id === requestId);
-        if (exists) return prev.map(r => r.id === requestId ? (data as any) : r);
-        return [data as any, ...prev];
-      });
-    }
-  };
-
-  const handleOpenTimeline = async (req: RequestItem) => {
-    setSelectedRequest(req);
-    setLoadingTimeline(true);
-
-    const { data } = await supabase
-      .from('request_logs')
-      .select(`
-        id, status_before, status_after, notes, created_at,
-        profiles:changed_by (full_name)
-      `)
-      .eq('request_id', req.id)
-      .order('created_at', { ascending: true });
-
-    if (data) setHistoryLogs(data as any);
-    setLoadingTimeline(false);
   };
 
   const generateTicketNumber = () => {
@@ -205,8 +117,8 @@ export default function UserDashboard() {
 
     if (oversizedFiles.length > 0) {
       notifications.show({
-        title: 'Berkas Terlalu Besar',
-        message: `Ukuran berkas melebihi ${MAX_SIZE_MB} MB.`,
+        title: 'Dokumen Terlalu Besar',
+        message: `Ukuran dokumen melebihi ${MAX_SIZE_MB} MB.`,
         color: 'red',
       });
       return;
@@ -215,14 +127,76 @@ export default function UserDashboard() {
     setFiles(payload);
   };
 
+  const removeFile = (indexToRemove: number) => {
+    setFiles(files.filter((_, index) => index !== indexToRemove));
+  };
+
+  const ValueComponent = ({ value }: { value: File | File[] | null }) => {
+    if (value === null) return null;
+
+    if (Array.isArray(value)) {
+      return (
+        <Group gap="xs">
+          {value.map((file, index) => (
+            <Badge
+              key={index}
+              variant="light"
+              color="gray"
+              radius="sm"
+              style={{ textTransform: 'none', cursor: 'default' }}
+              rightSection={
+                <Text
+                  component="span"
+                  size="xs"
+                  fw={900}
+                  style={{ cursor: 'pointer', padding: '0 4px' }}
+                  onClick={(e) => {
+                    e.preventDefault(); 
+                    e.stopPropagation();
+                    removeFile(index);
+                  }}
+                >
+                  ✕
+                </Text>
+              }
+            >
+              {file.name}
+            </Badge>
+          ))}
+        </Group>
+      );
+    }
+    return (
+      <Badge variant="light" color="gray" radius="sm" style={{ textTransform: 'none' }}>
+        {value.name}
+      </Badge>
+    );
+  };
+
   const handleUploadAndSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userProfile || !categoryId) return;
+    if (!userProfile) return;
+
+    if (!categoryId) {
+      notifications.show({
+        title: 'Data Belum Lengkap',
+        message: 'Harap pilih Kategori Pengajuan.', color: 'orange'
+      });
+      return;
+    }
 
     if (subCategoryOptions.length > 0 && !subCategory) {
       notifications.show({
         title: 'Data Belum Lengkap',
         message: 'Harap pilih sub-kategori tiket Anda sebelum mengirim.', color: 'orange'
+      });
+      return;
+    }
+
+    if (!requestTitle.trim()) {
+      notifications.show({
+        title: 'Data Belum Lengkap',
+        message: 'Harap isi Judul Pengajuan Anda.', color: 'orange'
       });
       return;
     }
@@ -235,10 +209,18 @@ export default function UserDashboard() {
       return;
     }
 
-    if (!isTiketCategory && files.length === 0) {
+    if (!description.trim()) {
+      notifications.show({
+        title: 'Data Belum Lengkap',
+        message: 'Harap isi Deskripsi Pengajuan Anda.', color: 'orange'
+      });
+      return;
+    }
+
+    if (!isHeadOffice && !isTiketCategory && files.length === 0) {
       notifications.show({
         title: 'Dokumen Wajib Dilampirkan',
-        message: 'Silakan unggah dokumen pengajuan dalam format PDF.', color: 'red'
+        message: 'Silakan unggah dokumen pengajuan.', color: 'orange'
       });
       return;
     }
@@ -251,7 +233,7 @@ export default function UserDashboard() {
       const ticketNumber = generateTicketNumber();
       const uploadedAttachments: { file_name: string; file_url: string; type: string }[] = [];
 
-      let uploadedFileUrl = '';
+
 
       for (const currentFile of files) {
         const fileExt = currentFile.name.split('.').pop();
@@ -328,9 +310,6 @@ export default function UserDashboard() {
       setCategoryId('');
       setFiles([]);
       setUrgency(null);
-
-      fetchUserRequests(userProfile.id);
-      setActiveMenu(1);
       setFormLoading(false);
 
       try {
@@ -390,7 +369,7 @@ export default function UserDashboard() {
                     const errData = await emailRes.json();
                     console.error(`API menolak email ke ${koor.full_name}:`, errData);
                   } else {
-                    const errText = await emailRes.text();
+                    await emailRes.text();
                     console.error(`API Crash (Bukan JSON) saat kirim ke ${koor.full_name}. Status: ${emailRes.status}`);
                   }
                 }
@@ -425,30 +404,11 @@ export default function UserDashboard() {
     }
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.replace('/login');
-  };
 
-  const handleSortRequest = (key: string) => {
-    if (sortKey === key) {
-      if (sortDirection === 'asc') setSortDirection('desc');
-      else if (sortDirection === 'desc') { setSortKey(null); setSortDirection(null); }
-    } else {
-      setSortKey(key);
-      setSortDirection('asc');
-    }
-  };
-
-  const renderSortArrow = (key: string) => {
-    if (sortKey !== key) return <Text component="span" size="xs" c="slateClean.3" ml={5}> ↕</Text>;
-    if (sortDirection === 'asc') return <Text component="span" size="xs" c="ptpn4Green.9" ml={5}> ▲</Text>;
-    return <Text component="span" size="xs" c="ptpn4Green.9" ml={5}> ▼</Text>;
-  };
 
   const activeCategoryLabel = categories.find(c => c.value === categoryId)?.label || '';
   const isTiketCategory = activeCategoryLabel.toLowerCase().includes('tiket');
-  const isHeadOffice = userProfile?.division?.includes('head office') || userProfile?.work_unit?.includes('head office') || userProfile?.division?.toLowerCase()=== 'ho' ||userProfile?.work_unit?.toLowerCase()=== 'ho';
+  const isHeadOffice = userProfile?.work_unit?.toLowerCase().includes('head office');
 
   if (loading || !userProfile) return null;
 
@@ -466,7 +426,7 @@ export default function UserDashboard() {
           <Text fw={800} size="xl" c="slateClean.9">Detail Pengajuan</Text>
         </Group>
 
-        <form onSubmit={handleUploadAndSubmit}>
+        <form onSubmit={handleUploadAndSubmit} noValidate>
           <Stack gap="md">
             <Select
               label="Kategori Pengajuan"
@@ -521,15 +481,16 @@ export default function UserDashboard() {
             />
             <FileInput
               label="Unggah Dokumen Pengajuan (PDF / .docx / .xlsx) - Maksimal 5 MB"
-              placeholder={isTiketCategory && !isHeadOffice ? "Opsional (dalam format PDF) - Maksimal 5 MB" : "Pilih dokumen dari perangkat Anda"}
+              placeholder={(!isHeadOffice && !isTiketCategory) ? "Pilih dokumen dari perangkat Anda" : "Opsional - Maksimal 5 MB"}
               required={!isTiketCategory && !isHeadOffice}
-              withAsterisk={!isTiketCategory && !isHeadOffice}
               value={files}
               onChange={handleFilesChange}
               accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,
                       application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               multiple
               radius="md"
+              clearable
+              valueComponent={ValueComponent}
             />
             <Button type="submit" loading={formLoading} color="ptpn4Green.9" fullWidth mt="lg" size="md" radius="md">
               Kirim Pengajuan

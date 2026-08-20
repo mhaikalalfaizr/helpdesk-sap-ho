@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { ticketNumber, subject, emailBody, consultantTo, consultantCc, replyToEmail, attachmentsData } = body;
+    const { ticketNumber, subject, emailBody, consultantTo, consultantCc, attachmentsData } = body;
 
     const { data: ticket, error: ticketError } = await supabaseAuth
       .from('requests')

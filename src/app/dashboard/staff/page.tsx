@@ -33,7 +33,7 @@ export default function PicDashboard() {
 
   const [finalUploadRequest, setFinalUploadRequest] = useState<RequestItem | null>(null);
 
-  const [selectedRequest, setSelectedRequest] = useState<RequestItem | null>(null);
+
   const [historyLogs, setHistoryLogs] = useState<RequestLog[]>([]);
   const [loadingTimeline, setLoadingTimeline] = useState(false);
 
@@ -75,22 +75,7 @@ export default function PicDashboard() {
     setPage(1);
   }, [activeFilter, showOnlyMine, searchQuery, urgencyFilter]);
 
-  const handleOpenTimeline = async (req: RequestItem) => {
-    setSelectedRequest(req);
-    setLoadingTimeline(true);
 
-    const { data } = await supabase
-      .from('request_logs')
-      .select(`
-          id, status_before, status_after, notes, created_at,
-          profiles:changed_by (full_name)
-        `)
-      .eq('request_id', req.id)
-      .order('created_at', { ascending: true });
-
-    if (data) setHistoryLogs(data as unknown as RequestLog[]);
-    setLoadingTimeline(false);
-  };
 
   const handleOpenDetailAndLogs = async (req: RequestItem) => {
     setSelectedDetail(req);
